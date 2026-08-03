@@ -1,0 +1,29 @@
+name: hindustan_traders
+description: A real production-ready wholesale grocery ordering app for Hindustan Traders.
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.5
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.18.1
+  supabase_flutter: ^1.6.2
+  provider: ^6.0.6
+  flutter_dotenv: ^6.0.1
+  http: ^0.4.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/translations/

@@ -1,0 +1,8 @@
+{
+  "app_name": "Hindustan Traders",
+  "splash_subtitle": "Your local grocery solution",
+  "login_title": "Login",
+  "login_phone_label": "Phone number",
+  "login_phone_hint": "Enter phone number",
+  "login_send_otp": "Send OTP"
+}
