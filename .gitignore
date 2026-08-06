@@ -1,0 +1,13 @@
+.dart_tool/
+.packages
+.pub/
+build/
+android/.gradle/
+android/app/debug/
+ios/Pods/
+ios/Flutter/Flutter.framework/
+.idea/
+.vscode/
+*.iml
+*.log
+.env

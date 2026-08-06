@@ -10,21 +10,22 @@ class LanguageSelectionScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = Provider.of<AppState>(context, listen: false);
+    final localized = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Language')),
+      appBar: AppBar(title: Text(localized.translate('language_title'))),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 24),
-            const Text('ଭାଷା ଚୟନ କରନ୍ତୁ', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text(localized.translate('language_prompt'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
-            _LanguageButton(label: 'Odia', locale: const Locale('or'), onTap: state.setLocale),
+            _LanguageButton(label: localized.translate('language_od'), locale: const Locale('or'), onTap: state.setLocale),
             const SizedBox(height: 12),
-            _LanguageButton(label: 'हिन्दी', locale: const Locale('hi'), onTap: state.setLocale),
+            _LanguageButton(label: localized.translate('language_hi'), locale: const Locale('hi'), onTap: state.setLocale),
             const SizedBox(height: 12),
-            _LanguageButton(label: 'English', locale: const Locale('en'), onTap: state.setLocale),
+            _LanguageButton(label: localized.translate('language_en'), locale: const Locale('en'), onTap: state.setLocale),
           ],
         ),
       ),

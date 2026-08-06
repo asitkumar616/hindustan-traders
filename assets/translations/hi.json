@@ -4,5 +4,49 @@
   "login_title": "लॉगिन",
   "login_phone_label": "फोन नंबर",
   "login_phone_hint": "फोन नंबर दर्ज करें",
-  "login_send_otp": "OTP भेजें"
-}
+  "login_send_otp": "OTP भेजें",
+  "login_otp_hint": "OTP दर्ज करें",
+  "login_verify_otp": "OTP सत्यापित करें",
+  "login_invalid_phone": "कृपया सही फोन नंबर दर्ज करें",
+  "login_invalid_otp": "कृपया 6 अंकों का OTP दर्ज करें",
+  "login_otp_sent": "OTP भेज दिया गया",
+  "login_send_otp_first": "कृपया पहले OTP भेजें",
+  "language_title": "भाषा सेटिंग",
+  "language_prompt": "भाषा चुनें",
+  "language_od": "ओड़िया",
+  "language_hi": "हिन्दी",
+  "language_en": "अंग्रेज़ी",
+  "home_placeholder": "आपका डैशबोर्ड आ रहा है..."
+  ,"customer_home_title": "ग्राहक डैशबोर्ड"
+  ,"customer_home_message": "स्वागत है ग्राहक। अपनी किराना ऑर्डर शुरू करें।"
+  ,"owner_home_title": "मालिक डैशबोर्ड"
+  ,"owner_home_message": "स्वागत है मालिक। उत्पाद, कीमतें और आने वाले ऑर्डर प्रबंधित करें।"
+  ,"voice_order_title": "वॉयस ऑर्डर"
+  ,"voice_order_message": "अपनी किराना सूची रिकॉर्ड करके जल्दी ऑर्डर शुरू करें।"
+  ,"voice_order_button": "ऑर्डर रिकॉर्ड करें"
+  ,"voice_order_stop_button": "रिकॉर्डिंग रोकें"
+  ,"voice_order_recording": "रिकॉर्डिंग जारी है..."
+  ,"voice_order_stopped": "रिकॉर्डिंग रुक गई"
+  ,"voice_order_permission_denied": "जारी रखने के लिए माइक्रोफ़ोन की अनुमति आवश्यक है।"
+  ,"voice_order_speech_unavailable": "इस डिवाइस पर वॉयस रिकग्निशन उपलब्ध नहीं है।"
+  ,"voice_order_stub_transcript": "सैंपल ट्रांसक्रिप्ट: 2 किलोग्राम चावल, 1 लीटर दूध, अंडे।"
+  ,"voice_order_preview_title": "ऑर्डर पूर्वावलोकन"
+  ,"voice_order_submit_button": "ऑर्डर जमा करें"
+  ,"voice_order_submitted": "ऑर्डर समीक्षा के लिए तैयार है"
+  ,"voice_order_hint": "यह वॉयस ऑर्डर के लिए स्टार्टर ढांचा है।"
+  ,"catalog_title": "कैटलॉग"
+  ,"catalog_message": "आम किराना सामान और कीमतें देखें।"
+  ,"order_draft_title": "ऑर्डर ड्राफ्ट"
+  ,"order_draft_items": "पहचाने गए आइटम"
+  ,"voice_order_submit_empty": "अभी जमा करने के लिए कोई ड्राफ्ट तैयार नहीं है।"
+  ,"voice_order_submit_saved_locally": "ड्राफ्ट स्थानीय रूप से सहेजा गया है और बैकएंड उपलब्ध होने पर सिंक होगा।"
+  ,"draft_history_title": "हाल के ड्राफ्ट"
+  ,"draft_history_empty": "अभी तक कोई सहेजा गया ड्राफ्ट नहीं है।"
+  ,"owner_orders_title": "आने वाले ऑर्डर"
+  ,"owner_orders_empty": "अभी तक कोई ऑर्डर नहीं आया है।"
+  ,"owner_orders_mark_ready": "तैयार चिह्नित करें"
+  ,"owner_orders_mark_complete": "पूर्ण चिह्नित करें"  ,"owner_order_detail_title": "ऑर्डर विवरण"
+  ,"owner_order_detail_transcript": "ट्रांसक्रिप्ट"
+  ,"owner_order_detail_items": "आइटम"
+  ,"owner_order_detail_status": "स्थिति"
+  ,"owner_order_detail_close": "बंद करें"}

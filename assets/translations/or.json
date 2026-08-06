@@ -4,5 +4,49 @@
   "login_title": "ଲଗଇନ୍",
   "login_phone_label": "ଫୋନ୍ ନମ୍ବର",
   "login_phone_hint": "ଫୋନ୍ ନମ୍ବର ଲେଖନ୍ତୁ",
-  "login_send_otp": "ଓ.ଟି.ପି ପଠାନ୍ତୁ"
-}
+  "login_send_otp": "ଓ.ଟି.ପି ପଠାନ୍ତୁ",
+  "login_otp_hint": "ଓ.ଟି.ପି ଲେଖନ୍ତୁ",
+  "login_verify_otp": "ଓ.ଟି.ପି ସତ୍ୟାପନ କରନ୍ତୁ",
+  "login_invalid_phone": "ଦୟାକରି ସଠିକ୍ ଫୋନ୍ ନମ୍ବର ଲେଖନ୍ତୁ",
+  "login_invalid_otp": "ଦୟାକରି 6 ଅଙ୍କର ଓ.ଟି.ପି ଲେଖନ୍ତୁ",
+  "login_otp_sent": "ଓ.ଟି.ପି ପଠାଯାଇଛି",
+  "login_send_otp_first": "ଦୟାକରି ପ୍ରଥମେ ଓ.ଟି.ପି ପଠାନ୍ତୁ",
+  "language_title": "ଭାଷା ସେଟିଂ",
+  "language_prompt": "ଭାଷା ଚୟନ କରନ୍ତୁ",
+  "language_od": "ଓଡ଼ିଆ",
+  "language_hi": "ହିନ୍ଦୀ",
+  "language_en": "ଇଂରାଜୀ",
+  "home_placeholder": "ଆପଣଙ୍କର ଡେଶବୋର୍ଡ ଆସୁଛି..."
+  ,"customer_home_title": "ଗ୍ରାହକ ଡ୍ୟାଶବୋର୍ଡ"
+  ,"customer_home_message": "ଗ୍ରାହକଙ୍କୁ ସ୍ୱାଗତ। ଆପଣଙ୍କର ଗ୍ରୋସେରୀ ଅର୍ଡର ଆରମ୍ଭ କରନ୍ତୁ।"
+  ,"owner_home_title": "ମାଲିକ ଡ୍ୟାଶବୋର୍ଡ"
+  ,"owner_home_message": "ମାଲିକଙ୍କୁ ସ୍ୱାଗତ। ପଣ୍ୟ, ଦର ଏବଂ ଆସୁଥିବା ଅର୍ଡର ପରିଚାଳନା କରନ୍ତୁ।"
+  ,"voice_order_title": "ଭଏସ୍ ଅର୍ଡର"
+  ,"voice_order_message": "ଆପଣଙ୍କର ଗ୍ରୋସେରୀ ତାଲିକା ରେକର୍ଡ କରି ଶୀଘ୍ର ଅର୍ଡର ଆରମ୍ଭ କରନ୍ତୁ।"
+  ,"voice_order_button": "ଅର୍ଡର ରେକର୍ଡ କରନ୍ତୁ"
+  ,"voice_order_stop_button": "ରେକର୍ଡିଂ ବନ୍ଦ କରନ୍ତୁ"
+  ,"voice_order_recording": "ରେକର୍ଡିଂ ଚାଲୁଛି..."
+  ,"voice_order_stopped": "ରେକର୍ଡିଂ ବନ୍ଦ ହୋଗଲା"
+  ,"voice_order_permission_denied": "ଚାଲୁ ରଖିବାକୁ ମାଇକ୍ରୋଫୋନ୍ ଅନୁମତି ଆବଶ୍ୟକ।"
+  ,"voice_order_speech_unavailable": "ଏହି ଡିଭାଇସ୍‌ରେ ଭଏସ୍ ରେକଗ୍ନିସନ ଉପଲବ୍ଧ ନାହିଁ।"
+  ,"voice_order_stub_transcript": "ନମୁନା ଟ୍ରାନ୍ସ୍କ୍ରିପ୍ଟ: 2 କିଲୋ ଚାବଲ, 1 ଲିଟର ଦୁଧ, ଅଣ୍ଡା।"
+  ,"voice_order_preview_title": "ଅର୍ଡର ପୂର୍ବାଲୋକନ"
+  ,"voice_order_submit_button": "ଅର୍ଡର ଜମା କରନ୍ତୁ"
+  ,"voice_order_submitted": "ଅର୍ଡର ସମୀକ୍ଷା ପାଇଁ ତିଆରି"
+  ,"voice_order_hint": "ଏହା ଭଏସ୍ ଅର୍ଡର ପାଇଁ ଷ୍ଟାର୍ଟର ସ୍କେଲେଟ୍।"
+  ,"catalog_title": "କ୍ୟାଟାଲୋଗ୍"
+  ,"catalog_message": "ସାଧାରଣ ଗ୍ରୋସେରୀ ଆଇଟମ୍ ଏବଂ ଦର ଦେଖନ୍ତୁ।"
+  ,"order_draft_title": "ଅର୍ଡର ଡ୍ରାଫ୍ଟ"
+  ,"order_draft_items": "ଚିହ୍ନିତ ଆଇଟମ୍"
+  ,"voice_order_submit_empty": "ଏବେ ଜମା କରିବାକୁ କୌଣସି ଡ୍ରାଫ୍ଟ ପ୍ରସ୍ତୁତ ନାହିଁ।"
+  ,"voice_order_submit_saved_locally": "ଡ୍ରାଫ୍ଟ ସ୍ଥାନୀୟ ଭାବେ ସଞ୍ଚୟ ହୋଇଛି ଏବଂ ବ୍ୟାକଏଣ୍ଡ ଉପଲବ୍ଧ ହେଲେ ସିଙ୍କ ହେବ।"
+  ,"draft_history_title": "ସାମ୍ପ୍ରତିକ ଡ୍ରାଫ୍ଟ"
+  ,"draft_history_empty": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ସଂରକ୍ଷିତ ଡ୍ରାଫ୍ଟ ନାହିଁ।"
+  ,"owner_orders_title": "ଆସୁଥିବା ଅର୍ଡର"
+  ,"owner_orders_empty": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ଅର୍ଡର ଆସିନାହିଁ।"
+  ,"owner_orders_mark_ready": "ତୋୟାର ଚିହ୍ନିତ କରନ୍ତୁ"
+  ,"owner_orders_mark_complete": "ସମ୍ପୂର୍ଣ୍ଣ ଚିହ୍ନିତ କରନ୍ତୁ"  ,"owner_order_detail_title": "ଅର୍ଡର ବିବରଣୀ"
+  ,"owner_order_detail_transcript": "ଟ୍ରାନ୍ସ୍କ୍ରିପ୍ଟ"
+  ,"owner_order_detail_items": "ଆଇଟମ୍"
+  ,"owner_order_detail_status": "ସ୍ଥିତି"
+  ,"owner_order_detail_close": "ବନ୍ଦ କରନ୍ତୁ"}

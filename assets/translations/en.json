@@ -4,5 +4,49 @@
   "login_title": "Login",
   "login_phone_label": "Phone number",
   "login_phone_hint": "Enter phone number",
-  "login_send_otp": "Send OTP"
-}
+  "login_send_otp": "Send OTP",
+  "login_otp_hint": "Enter OTP",
+  "login_verify_otp": "Verify OTP",
+  "login_invalid_phone": "Please enter a valid phone number",
+  "login_invalid_otp": "Please enter the 6-digit OTP",
+  "login_otp_sent": "OTP sent",
+  "login_send_otp_first": "Please send OTP first",
+  "language_title": "Language Settings",
+  "language_prompt": "Choose your language",
+  "language_od": "Odia",
+  "language_hi": "Hindi",
+  "language_en": "English",
+  "home_placeholder": "Your dashboard is coming soon..."
+  ,"customer_home_title": "Customer Dashboard"
+  ,"customer_home_message": "Welcome customer. Start creating your grocery order."
+  ,"owner_home_title": "Owner Dashboard"
+  ,"owner_home_message": "Welcome owner. Manage products, prices, and incoming orders."
+  ,"voice_order_title": "Voice order"
+  ,"voice_order_message": "Start a quick order by recording your grocery list."
+  ,"voice_order_button": "Record order"
+  ,"voice_order_stop_button": "Stop recording"
+  ,"voice_order_recording": "Recording..."
+  ,"voice_order_stopped": "Recording stopped"
+  ,"voice_order_permission_denied": "Microphone permission is required to continue."
+  ,"voice_order_speech_unavailable": "Speech recognition is unavailable on this device."
+  ,"voice_order_stub_transcript": "Sample transcript: 2 kg rice, 1 litre milk, eggs."
+  ,"voice_order_preview_title": "Order preview"
+  ,"voice_order_submit_button": "Submit order"
+  ,"voice_order_submitted": "Order prepared for review"
+  ,"voice_order_hint": "This is a starter scaffold for voice ordering."
+  ,"catalog_title": "Catalog"
+  ,"catalog_message": "Browse common grocery items and prices."
+  ,"order_draft_title": "Order draft"
+  ,"order_draft_items": "Detected items"
+  ,"voice_order_submit_empty": "No draft is ready to submit yet."
+  ,"voice_order_submit_saved_locally": "The draft was saved locally and will sync when the backend is available."
+  ,"draft_history_title": "Recent drafts"
+  ,"draft_history_empty": "No saved drafts yet."
+  ,"owner_orders_title": "Incoming orders"
+  ,"owner_orders_empty": "No orders have arrived yet."
+  ,"owner_orders_mark_ready": "Mark ready"
+  ,"owner_orders_mark_complete": "Mark complete"  ,"owner_order_detail_title": "Order details"
+  ,"owner_order_detail_transcript": "Transcript"
+  ,"owner_order_detail_items": "Items"
+  ,"owner_order_detail_status": "Status"
+  ,"owner_order_detail_close": "Close"}
