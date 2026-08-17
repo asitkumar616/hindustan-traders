@@ -7,7 +7,11 @@ import '../services/order_draft_service.dart';
 import 'order_draft_summary.dart';
 
 class VoiceOrderCard extends StatefulWidget {
-  const VoiceOrderCard({super.key});
+  const VoiceOrderCard({super.key, this.businessId});
+
+  // The shop this order should be placed against. Omit to fall back to the
+  // caller's default business (used by the owner's own voice-order card).
+  final String? businessId;
 
   @override
   State<VoiceOrderCard> createState() => _VoiceOrderCardState();
@@ -16,9 +20,19 @@ class VoiceOrderCard extends StatefulWidget {
 class _VoiceOrderCardState extends State<VoiceOrderCard> {
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isRecording = false;
-  String _transcript = '';
+  bool _isSubmitting = false;
+  String _liveTranscript = '';
   String _status = '';
-  OrderDraft? _draft;
+
+  // The running cart for this shop. Each recognized utterance adds items
+  // to this list rather than replacing it -- this is what lets the
+  // customer build a multi-item order ("give me 5kg rice", then later
+  // "also toor dal") before confirming, instead of every mic tap
+  // discarding whatever was already recognized.
+  final List<String> _cartItems = [];
+  final List<String> _transcriptLog = [];
+
+  bool get _hasCartItems => _cartItems.isNotEmpty;
 
   @override
   void initState() {
@@ -67,18 +81,16 @@ class _VoiceOrderCardState extends State<VoiceOrderCard> {
     setState(() {
       _isRecording = true;
       _status = localized.translate('voice_order_recording');
-      _transcript = '';
-      _draft = null;
+      _liveTranscript = '';
     });
 
     await _speech.listen(
       onResult: (result) {
         if (!mounted) return;
         setState(() {
-          _transcript = result.recognizedWords;
+          _liveTranscript = result.recognizedWords;
           if (result.finalResult) {
-            _draft = _buildDraft(_transcript);
-            _status = localized.translate('voice_order_stopped');
+            _addUtteranceToCart(result.recognizedWords, localized);
             _isRecording = false;
           }
         });
@@ -89,25 +101,62 @@ class _VoiceOrderCardState extends State<VoiceOrderCard> {
     );
   }
 
-  OrderDraft _buildDraft(String transcript) {
-    return OrderDraftService.parseTranscript(transcript);
+  void _addUtteranceToCart(String transcript, AppLocalizations localized) {
+    final parsed = OrderDraftService.parseTranscript(transcript);
+    final newItems = parsed.items.where((item) => item != 'No items detected').toList();
+
+    if (newItems.isEmpty) {
+      _status = localized.translate('voice_order_stopped');
+      return;
+    }
+
+    _transcriptLog.add(transcript);
+    for (final item in newItems) {
+      if (!_cartItems.contains(item)) {
+        _cartItems.add(item);
+      }
+    }
+    _status = 'Added to cart. Tap the mic again to add more, or confirm to place the order.';
+  }
+
+  OrderDraft get _cartDraft => OrderDraft(transcript: _transcriptLog.join(' | '), items: _cartItems);
+
+  void _clearCart() {
+    setState(() {
+      _cartItems.clear();
+      _transcriptLog.clear();
+      _liveTranscript = '';
+      _status = 'Cart cleared.';
+    });
   }
 
   Future<void> _submitDraft() async {
-    if (_draft == null) {
+    if (!_hasCartItems) {
       setState(() {
         _status = AppLocalizations.of(context).translate('voice_order_submit_empty');
       });
       return;
     }
 
-    final result = await OrderDraftService.submitDraft(_draft!);
+    setState(() => _isSubmitting = true);
+
+    final result = await OrderDraftService.submitDraft(_cartDraft, businessId: widget.businessId);
     if (!mounted) return;
 
     setState(() {
-      _status = result.message.isNotEmpty ? result.message : (result.success
-          ? AppLocalizations.of(context).translate('voice_order_submitted')
-          : AppLocalizations.of(context).translate('voice_order_submit_saved_locally'));
+      _isSubmitting = false;
+      _status = result.message.isNotEmpty
+          ? result.message
+          : (result.success
+              ? AppLocalizations.of(context).translate('voice_order_submitted')
+              : AppLocalizations.of(context).translate('voice_order_submit_saved_locally'));
+
+      if (result.success) {
+        // Order placed -- start a fresh cart for whatever comes next.
+        _cartItems.clear();
+        _transcriptLog.clear();
+        _liveTranscript = '';
+      }
     });
   }
 
@@ -133,12 +182,12 @@ class _VoiceOrderCardState extends State<VoiceOrderCard> {
             Text(localized.translate('voice_order_message')),
             const SizedBox(height: 12),
             ElevatedButton.icon(
-              onPressed: () => _toggleRecording(context),
+              onPressed: _isSubmitting ? null : () => _toggleRecording(context),
               icon: Icon(_isRecording ? Icons.stop : Icons.mic),
               label: Text(
                 _isRecording
                     ? localized.translate('voice_order_stop_button')
-                    : localized.translate('voice_order_button'),
+                    : (_hasCartItems ? 'Add more items' : localized.translate('voice_order_button')),
               ),
             ),
             const SizedBox(height: 12),
@@ -147,7 +196,7 @@ class _VoiceOrderCardState extends State<VoiceOrderCard> {
                 _status,
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
-            if (_transcript.isNotEmpty) ...[
+            if (_liveTranscript.isNotEmpty) ...[
               const SizedBox(height: 8),
               Container(
                 width: double.infinity,
@@ -161,26 +210,37 @@ class _VoiceOrderCardState extends State<VoiceOrderCard> {
                   children: [
                     Text(localized.translate('voice_order_preview_title')),
                     const SizedBox(height: 6),
-                    Text(_transcript),
+                    Text(_liveTranscript),
                   ],
                 ),
               ),
             ],
-            if (_draft != null) ...[
+            if (_hasCartItems) ...[
               const SizedBox(height: 8),
-              OrderDraftSummary(draft: _draft!),
+              OrderDraftSummary(draft: _cartDraft),
             ],
             const SizedBox(height: 12),
-            if (_transcript.isNotEmpty)
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _submitDraft,
-                  icon: const Icon(Icons.check_circle_outline),
-                  label: Text(localized.translate('voice_order_submit_button')),
-                ),
+            if (_hasCartItems) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _isSubmitting ? null : _submitDraft,
+                      icon: _isSubmitting
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.check_circle_outline),
+                      label: Text(localized.translate('voice_order_submit_button')),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: _isSubmitting ? null : _clearCart,
+                    child: const Text('Clear cart'),
+                  ),
+                ],
               ),
-            const SizedBox(height: 8),
+              const SizedBox(height: 8),
+            ],
             Text(
               localized.translate('voice_order_hint'),
               style: TextStyle(color: Colors.grey[700]),

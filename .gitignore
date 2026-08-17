@@ -11,3 +11,5 @@ ios/Flutter/Flutter.framework/
 *.iml
 *.log
 .env
+node_modules/
+*.zip

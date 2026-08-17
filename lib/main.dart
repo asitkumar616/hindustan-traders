@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -5,12 +6,11 @@ import 'src/localization/app_localizations.dart';
 import 'src/services/app_state.dart';
 import 'src/screens/splash_screen.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final appState = AppState();
-  await appState.init();
-
   runApp(HindustanTradersApp(appState: appState));
+  unawaited(appState.init());
 }
 
 class HindustanTradersApp extends StatelessWidget {

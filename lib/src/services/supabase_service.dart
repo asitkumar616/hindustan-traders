@@ -12,7 +12,6 @@ class SupabaseService {
     await Supabase.initialize(
       url: url,
       anonKey: anonKey,
-      authCallbackUrlHostname: 'login-callback',
       debug: true,
     );
 

@@ -64,23 +64,37 @@ class CustomerBusinessService {
         .eq('phone', normalizedPhone)
         .maybeSingle();
 
+    Map<String, dynamic> record;
     if (existing != null) {
-      final updated = await client
+      record = await client
           .from('customers')
           .update(payload)
           .eq('id', existing['id'])
           .select('id, business_id, profile_id, display_name, phone, status, shop_name, created_at')
           .single();
-      return updated;
+    } else {
+      record = await client
+          .from('customers')
+          .insert(payload)
+          .select('id, business_id, profile_id, display_name, phone, status, shop_name, created_at')
+          .single();
     }
 
-    final created = await client
-        .from('customers')
-        .insert(payload)
-        .select('id, business_id, profile_id, display_name, phone, status, shop_name, created_at')
-        .single();
+    // Link this customer to the business immediately (not only at their
+    // first login), so a customer already linked to another owner's
+    // business becomes associated with this one too, without creating a
+    // duplicate customer person -- this is the same customer_businesses
+    // relationship mvp_login_with_phone keeps in sync on every login.
+    await client.from('customer_businesses').upsert(
+      {
+        'customer_id': record['id'],
+        'business_id': businessId,
+        'status': 'ACTIVE',
+      },
+      onConflict: 'customer_id,business_id',
+    );
 
-    return created;
+    return record;
   }
 
   static Future<Map<String, dynamic>?> findCustomerByPhone(String phone) async {

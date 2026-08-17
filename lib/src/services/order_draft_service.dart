@@ -101,7 +101,11 @@ class OrderDraftService {
     };
   }
 
-  static Future<OrderSubmissionResult> submitDraft(OrderDraft draft) async {
+  // businessId identifies which shop this order belongs to (the customer's
+  // currently selected shop). Falls back to the profile's default business
+  // when omitted, so existing callers (e.g. the owner's own voice-order
+  // card) keep working unchanged.
+  static Future<OrderSubmissionResult> submitDraft(OrderDraft draft, {String? businessId}) async {
     try {
       final user = AuthService.currentUser;
       if (user == null) {
@@ -113,9 +117,8 @@ class OrderDraftService {
         );
       }
 
-      final profile = await AuthService.fetchProfileById(user.id);
-      final businessId = profile?.businessId;
-      if (businessId == null || businessId.isEmpty) {
+      final resolvedBusinessId = businessId ?? (await AuthService.fetchProfileById(user.id))?.businessId;
+      if (resolvedBusinessId == null || resolvedBusinessId.isEmpty) {
         await _persistDraftLocally(draft);
         return const OrderSubmissionResult(
           success: false,
@@ -133,7 +136,7 @@ class OrderDraftService {
         );
       }
 
-      final products = await CustomerBusinessService.getProductsForBusiness(businessId);
+      final products = await CustomerBusinessService.getProductsForBusiness(resolvedBusinessId);
       final orderItems = buildOrderItems(draft.items);
       final mappedProducts = <Map<String, dynamic>>[];
       for (final item in orderItems) {
@@ -143,7 +146,7 @@ class OrderDraftService {
 
       final orderResponse = await SupabaseService.client.from('orders').insert({
         'customer_id': user.id,
-        'business_id': businessId,
+        'business_id': resolvedBusinessId,
         'status': 'pending',
         'total_amount': mappedProducts.fold<double>(0, (sum, current) => sum + (current['amount'] as num).toDouble()),
       }).select('id').single();
@@ -162,7 +165,7 @@ class OrderDraftService {
         );
 
         final invoiceDraft = await CustomerBusinessService.createInvoiceDraft(
-          businessId: businessId,
+          businessId: resolvedBusinessId,
           customerId: user.id,
           orderId: orderId,
           totalAmount: mappedProducts.fold<double>(0, (sum, current) => sum + (current['amount'] as num).toDouble()),
@@ -170,7 +173,7 @@ class OrderDraftService {
         if (invoiceDraft != null) {
           await SupabaseService.client.from('notifications').insert({
             'recipient_id': user.id,
-            'business_id': businessId,
+            'business_id': resolvedBusinessId,
             'title': 'Invoice draft created',
             'body': 'Invoice ${invoiceDraft['invoice_number']} is ready for review.',
             'data': {'invoice_id': invoiceDraft['id']},

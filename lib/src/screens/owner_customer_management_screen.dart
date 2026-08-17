@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/customer_business_service.dart';
+import '../services/owner_dashboard_service.dart';
 
 class OwnerCustomerManagementScreen extends StatefulWidget {
-  const OwnerCustomerManagementScreen({super.key, required this.businessId});
+  const OwnerCustomerManagementScreen({super.key, required this.businessId, this.onlyOutstanding = false});
 
   final String businessId;
+  final bool onlyOutstanding;
 
   @override
   State<OwnerCustomerManagementScreen> createState() => _OwnerCustomerManagementScreenState();
@@ -19,7 +21,7 @@ class _OwnerCustomerManagementScreenState extends State<OwnerCustomerManagementS
   final _openingBalanceController = TextEditingController(text: '0');
   bool _isSubmitting = false;
   bool _isLoadingCustomers = true;
-  List<Map<String, dynamic>> _customers = [];
+  List<OwnerCustomerBalance> _customers = const <OwnerCustomerBalance>[];
 
   @override
   void initState() {
@@ -40,9 +42,15 @@ class _OwnerCustomerManagementScreenState extends State<OwnerCustomerManagementS
   Future<void> _loadCustomers() async {
     setState(() => _isLoadingCustomers = true);
     try {
-      final customers = await CustomerBusinessService.getCustomersForBusiness(widget.businessId);
+      final customers = await OwnerDashboardService.fetchCustomerBalances(onlyOutstanding: widget.onlyOutstanding);
       if (mounted) {
         setState(() => _customers = customers);
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to load customers: $error')),
+        );
       }
     } finally {
       if (mounted) {
@@ -89,7 +97,12 @@ class _OwnerCustomerManagementScreenState extends State<OwnerCustomerManagementS
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Customers')),
+      appBar: AppBar(
+        title: Text(widget.onlyOutstanding ? 'Outstanding Customers' : 'Customers'),
+        actions: [
+          IconButton(onPressed: _loadCustomers, icon: const Icon(Icons.refresh)),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -130,25 +143,48 @@ class _OwnerCustomerManagementScreenState extends State<OwnerCustomerManagementS
                   : const Text('Link customer'),
             ),
             const SizedBox(height: 24),
-            const Text('Customers in this shop', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            Text(
+              widget.onlyOutstanding ? 'Customers with an outstanding balance' : 'Customers in this shop',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
             const SizedBox(height: 8),
             if (_isLoadingCustomers)
               const Center(child: CircularProgressIndicator())
             else if (_customers.isEmpty)
-              const Text('No customers linked yet.')
+              Text(widget.onlyOutstanding ? 'No customers with an outstanding balance.' : 'No customers linked yet.')
             else
               Expanded(
                 child: ListView.builder(
                   itemCount: _customers.length,
                   itemBuilder: (_, index) {
                     final customer = _customers[index];
-                    final displayName = customer['display_name']?.toString() ?? 'Customer';
-                    final shopName = customer['shop_name']?.toString() ?? '—';
-                    final phone = customer['phone']?.toString() ?? '—';
-                    return ListTile(
-                      title: Text(displayName),
-                      subtitle: Text('$shopName • $phone'),
-                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    final lastOrder = customer.lastOrderAt;
+                    final lastOrderText = lastOrder == null
+                        ? 'No orders yet'
+                        : 'Last order: ${lastOrder.toLocal().day.toString().padLeft(2, '0')}/'
+                            '${lastOrder.toLocal().month.toString().padLeft(2, '0')}/${lastOrder.toLocal().year}';
+
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        title: Text(customer.displayName),
+                        subtitle: Text('${customer.phone ?? '—'}\n$lastOrderText'),
+                        isThreeLine: true,
+                        trailing: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              '₹${customer.outstandingAmount.toStringAsFixed(0)}',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: customer.outstandingAmount > 0 ? Colors.red.shade700 : Colors.green.shade700,
+                              ),
+                            ),
+                            const Text('outstanding', style: TextStyle(fontSize: 11, color: Colors.black54)),
+                          ],
+                        ),
+                      ),
                     );
                   },
                 ),
