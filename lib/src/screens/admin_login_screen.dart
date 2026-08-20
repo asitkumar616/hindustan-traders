@@ -96,7 +96,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                       controller: _usernameController,
                       decoration: const InputDecoration(
                         labelText: 'Username',
-                        border: OutlineInputBorder(),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -105,7 +104,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                       obscureText: !_showPassword,
                       decoration: InputDecoration(
                         labelText: 'Password',
-                        border: const OutlineInputBorder(),
                         suffixIcon: IconButton(
                           onPressed: () => setState(() => _showPassword = !_showPassword),
                           icon: Icon(_showPassword ? Icons.visibility_off : Icons.visibility),

@@ -197,7 +197,6 @@ class _OwnerInvoicesScreenState extends State<OwnerInvoicesScreen> {
                               },
                               icon: const Icon(Icons.clear),
                             ),
-                      border: const OutlineInputBorder(),
                       isDense: true,
                     ),
                   ),

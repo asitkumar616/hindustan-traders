@@ -390,7 +390,6 @@ class _AdminOwnerManagementScreenState extends State<AdminOwnerManagementScreen>
                   },
                   icon: const Icon(Icons.clear),
                 ),
-                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 14),

@@ -4,6 +4,7 @@ import '../src/screens/login_screen.dart';
 import '../src/services/auth_service.dart';
 import '../src/services/customer_business_service.dart';
 import '../src/widgets/draft_history_card.dart';
+import '../src/widgets/notifications_card.dart';
 import '../src/widgets/product_catalog_card.dart';
 import '../src/widgets/voice_order_card.dart';
 
@@ -85,6 +86,8 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 20),
+              NotificationsCard(businessId: widget.businessId),
               const SizedBox(height: 20),
               ProductCatalogCard(
                 businessName: widget.businessName,

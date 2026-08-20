@@ -95,7 +95,15 @@ class _CustomerShopsScreenState extends State<CustomerShopsScreen> {
                 style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 4),
-              const Text('MY SHOPS', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.black54)),
+              Text(
+                'MY SHOPS',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.4,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
               const SizedBox(height: 16),
               if (_loadError != null)
                 Container(
@@ -125,15 +133,22 @@ class _CustomerShopsScreenState extends State<CustomerShopsScreen> {
                         padding: const EdgeInsets.all(16),
                         child: Row(
                           children: [
-                            const Text('🏪', style: TextStyle(fontSize: 28)),
-                            const SizedBox(width: 12),
+                            CircleAvatar(
+                              radius: 22,
+                              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                              child: Icon(Icons.storefront_rounded, color: Theme.of(context).colorScheme.onPrimaryContainer),
+                            ),
+                            const SizedBox(width: 14),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(business.businessName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                                   if (business.customerDisplayName?.isNotEmpty == true)
-                                    Text(business.customerDisplayName!, style: const TextStyle(color: Colors.black54, fontSize: 12)),
+                                    Text(
+                                      business.customerDisplayName!,
+                                      style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12),
+                                    ),
                                 ],
                               ),
                             ),

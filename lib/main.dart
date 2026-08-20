@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'src/localization/app_localizations.dart';
 import 'src/services/app_state.dart';
 import 'src/screens/splash_screen.dart';
+import 'src/theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,10 +26,7 @@ class HindustanTradersApp extends StatelessWidget {
       child: Consumer<AppState>(builder: (context, state, child) {
         return MaterialApp(
           title: 'Hindustan Traders',
-          theme: ThemeData(
-            primarySwatch: Colors.green,
-            visualDensity: VisualDensity.adaptivePlatformDensity,
-          ),
+          theme: AppTheme.light,
           locale: state.locale,
           supportedLocales: AppLocalizations.supportedLocales,
           localizationsDelegates: const [

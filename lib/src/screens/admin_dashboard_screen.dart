@@ -6,8 +6,8 @@ import '../services/auth_service.dart';
 import '../widgets/brand_logo.dart';
 import 'admin_business_list_screen.dart';
 import 'admin_customer_list_screen.dart';
-import 'admin_login_screen.dart';
 import 'admin_owner_management_screen.dart';
+import 'login_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -55,7 +55,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               if (!context.mounted) return;
               Navigator.pushAndRemoveUntil(
                 context,
-                MaterialPageRoute(builder: (_) => const AdminLoginScreen()),
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
                 (route) => false,
               );
             },

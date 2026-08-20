@@ -19,7 +19,6 @@ class _OwnerCustomerManagementScreenState extends State<OwnerCustomerManagementS
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
   final _openingBalanceController = TextEditingController(text: '0');
-  bool _isSubmitting = false;
   bool _isLoadingCustomers = true;
   List<OwnerCustomerBalance> _customers = const <OwnerCustomerBalance>[];
 
@@ -59,13 +58,12 @@ class _OwnerCustomerManagementScreenState extends State<OwnerCustomerManagementS
     }
   }
 
-  Future<void> _addCustomer() async {
+  Future<bool> _addCustomer(bool isActive) async {
     final user = AuthService.currentUser;
     if (user == null) {
-      return;
+      return false;
     }
 
-    setState(() => _isSubmitting = true);
     try {
       await CustomerBusinessService.createCustomerRecord(
         businessId: widget.businessId,
@@ -74,9 +72,10 @@ class _OwnerCustomerManagementScreenState extends State<OwnerCustomerManagementS
         shopName: _shopNameController.text.trim(),
         address: _addressController.text.trim(),
         openingBalance: double.tryParse(_openingBalanceController.text.trim()) ?? 0,
+        isActive: isActive,
       );
 
-      if (!mounted) return;
+      if (!mounted) return true;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Customer record created')));
       _customerNameController.clear();
       _shopNameController.clear();
@@ -84,14 +83,185 @@ class _OwnerCustomerManagementScreenState extends State<OwnerCustomerManagementS
       _addressController.clear();
       _openingBalanceController.text = '0';
       await _loadCustomers();
+      return true;
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted) return false;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Unable to add customer: $error')));
-    } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-      }
+      return false;
     }
+  }
+
+  Future<void> _showAddCustomerDialog() async {
+    _customerNameController.clear();
+    _shopNameController.clear();
+    _phoneController.clear();
+    _addressController.clear();
+    _openingBalanceController.text = '0';
+    bool isActive = true;
+    bool submitting = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Add customer'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: _customerNameController,
+                      decoration: const InputDecoration(labelText: 'Customer name'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _shopNameController,
+                      decoration: const InputDecoration(labelText: 'Shop name'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _phoneController,
+                      keyboardType: TextInputType.phone,
+                      decoration: const InputDecoration(labelText: 'Phone number'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _addressController,
+                      decoration: const InputDecoration(labelText: 'Address'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _openingBalanceController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(labelText: 'Opening balance'),
+                    ),
+                    const SizedBox(height: 4),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Active'),
+                      subtitle: Text(isActive ? 'Customer can place orders' : 'Customer is blocked from ordering'),
+                      value: isActive,
+                      onChanged: submitting ? null : (value) => setDialogState(() => isActive = value),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: submitting ? null : () => Navigator.pop(dialogContext),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: submitting
+                      ? null
+                      : () async {
+                          setDialogState(() => submitting = true);
+                          final success = await _addCustomer(isActive);
+                          if (!dialogContext.mounted) return;
+                          if (success) {
+                            Navigator.pop(dialogContext);
+                          } else {
+                            setDialogState(() => submitting = false);
+                          }
+                        },
+                  child: submitting
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _detailRow(String label, dynamic value) {
+    final text = (value == null || value.toString().trim().isEmpty) ? '—' : value.toString();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: 120, child: Text(label, style: const TextStyle(color: Colors.black54))),
+          Expanded(child: Text(text)),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showCustomerDetails(OwnerCustomerBalance customer) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return FutureBuilder<Map<String, dynamic>?>(
+          future: CustomerBusinessService.getCustomerById(customer.customerId),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const AlertDialog(
+                content: SizedBox(height: 80, child: Center(child: CircularProgressIndicator())),
+              );
+            }
+
+            final data = snapshot.data;
+            if (data == null) {
+              return AlertDialog(
+                title: const Text('Customer details'),
+                content: const Text('Unable to load this customer.'),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close')),
+                ],
+              );
+            }
+
+            final isRegistered = data['profile_id'] != null;
+            bool isBlocked = (data['status'] as String?) == 'BLOCKED';
+
+            return StatefulBuilder(
+              builder: (context, setDialogState) {
+                return AlertDialog(
+                  title: Text(data['display_name'] as String? ?? 'Customer'),
+                  content: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _detailRow('Shop', data['shop_name']),
+                        _detailRow('Phone', data['phone']),
+                        _detailRow('Address', data['address']),
+                        _detailRow('Opening balance', '₹${(data['opening_balance'] as num? ?? 0).toStringAsFixed(0)}'),
+                        _detailRow('Registered', isRegistered ? 'Yes' : 'Not yet'),
+                        const SizedBox(height: 8),
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Active'),
+                          subtitle: Text(isBlocked ? 'Customer is blocked from ordering' : 'Customer can place orders'),
+                          value: !isBlocked,
+                          onChanged: (value) async {
+                            await CustomerBusinessService.setCustomerBlocked(
+                              customer.customerId,
+                              !value,
+                              isRegistered: isRegistered,
+                            );
+                            setDialogState(() => isBlocked = !value);
+                            if (mounted) await _loadCustomers();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close')),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -108,48 +278,13 @@ class _OwnerCustomerManagementScreenState extends State<OwnerCustomerManagementS
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Add a customer to this shop', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _customerNameController,
-              decoration: const InputDecoration(labelText: 'Customer name', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _shopNameController,
-              decoration: const InputDecoration(labelText: 'Shop name', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _phoneController,
-              decoration: const InputDecoration(labelText: 'Phone number', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _addressController,
-              decoration: const InputDecoration(labelText: 'Address', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _openingBalanceController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: 'Opening balance', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _isSubmitting ? null : _addCustomer,
-              child: _isSubmitting
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Link customer'),
-            ),
-            const SizedBox(height: 24),
             Text(
               widget.onlyOutstanding ? 'Customers with an outstanding balance' : 'Customers in this shop',
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
             if (_isLoadingCustomers)
-              const Center(child: CircularProgressIndicator())
+              const Expanded(child: Center(child: CircularProgressIndicator()))
             else if (_customers.isEmpty)
               Text(widget.onlyOutstanding ? 'No customers with an outstanding balance.' : 'No customers linked yet.')
             else
@@ -167,6 +302,7 @@ class _OwnerCustomerManagementScreenState extends State<OwnerCustomerManagementS
                     return Card(
                       margin: const EdgeInsets.only(bottom: 8),
                       child: ListTile(
+                        onTap: () => _showCustomerDetails(customer),
                         title: Text(customer.displayName),
                         subtitle: Text('${customer.phone ?? '—'}\n$lastOrderText'),
                         isThreeLine: true,
@@ -191,6 +327,11 @@ class _OwnerCustomerManagementScreenState extends State<OwnerCustomerManagementS
               ),
           ],
         ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showAddCustomerDialog,
+        icon: const Icon(Icons.add),
+        label: const Text('Add customer'),
       ),
     );
   }

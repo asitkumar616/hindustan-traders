@@ -27,17 +27,34 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     final localized = AppLocalizations.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const BrandLogo(size: 108, showLabel: true),
-            const SizedBox(height: 16),
-            Text(localized.translate('app_name'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Text(localized.translate('splash_subtitle'), style: const TextStyle(fontSize: 16)),
-          ],
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [colorScheme.primary, colorScheme.primaryContainer],
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const BrandLogo(size: 108, showLabel: false),
+              const SizedBox(height: 20),
+              Text(
+                localized.translate('app_name'),
+                style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.3),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                localized.translate('splash_subtitle'),
+                style: TextStyle(fontSize: 15, color: Colors.white.withValues(alpha: 0.85)),
+              ),
+            ],
+          ),
         ),
       ),
     );

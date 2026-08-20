@@ -39,6 +39,7 @@ class CustomerBusinessService {
     required String shopName,
     required String address,
     required double openingBalance,
+    bool isActive = true,
   }) async {
     final normalizedPhone = AuthService.normalizeIndianPhone(phone) ?? phone.trim();
     final payload = {
@@ -49,7 +50,7 @@ class CustomerBusinessService {
       'shop_name': shopName.trim(),
       'address': address.trim(),
       'opening_balance': openingBalance,
-      'status': 'NOT_REGISTERED',
+      'status': isActive ? 'NOT_REGISTERED' : 'BLOCKED',
       'profile_id': null,
       'is_active': false,
     };
@@ -95,6 +96,29 @@ class CustomerBusinessService {
     );
 
     return record;
+  }
+
+  static Future<Map<String, dynamic>?> getCustomerById(String customerId) async {
+    final client = _clientOrNull;
+    if (client == null) return null;
+
+    return await client
+        .from('customers')
+        .select('id, business_id, profile_id, display_name, customer_name, shop_name, phone, address, opening_balance, credit_limit, status, is_active, created_at')
+        .eq('id', customerId)
+        .maybeSingle();
+  }
+
+  static Future<void> setCustomerBlocked(
+    String customerId,
+    bool blocked, {
+    required bool isRegistered,
+  }) async {
+    final client = _clientOrNull;
+    if (client == null) return;
+
+    final status = blocked ? 'BLOCKED' : (isRegistered ? 'ACTIVE' : 'NOT_REGISTERED');
+    await client.from('customers').update({'status': status}).eq('id', customerId);
   }
 
   static Future<Map<String, dynamic>?> findCustomerByPhone(String phone) async {

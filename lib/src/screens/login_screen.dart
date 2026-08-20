@@ -85,84 +85,97 @@ class _LoginScreenState extends State<LoginScreen> {
     final appState = context.watch<AppState>();
     final localized = AppLocalizations.of(context);
     final backendReady = appState.backendReady;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(title: Text(localized.translate('login_title'))),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SizedBox(height: 8),
-            const Center(child: BrandLogo(size: 96, showLabel: true)),
-            const SizedBox(height: 28),
-            if (!backendReady) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.orange.shade200),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.info_outline, color: Colors.orange.shade800),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        appState.backendStatus,
-                        style: TextStyle(color: Colors.orange.shade900, fontWeight: FontWeight.w600),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 8),
+                  const Center(child: BrandLogo(size: 96, showLabel: true)),
+                  const SizedBox(height: 32),
+                  if (!backendReady) ...[
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: colorScheme.errorContainer,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.info_outline, color: colorScheme.onErrorContainer),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              appState.backendStatus,
+                              style: TextStyle(color: colorScheme.onErrorContainer, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+                    const SizedBox(height: 20),
                   ],
-                ),
+                  Text(
+                    localized.translate('login_phone_label'),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9+]')),
+                    ],
+                    decoration: InputDecoration(
+                      hintText: localized.translate('login_phone_hint'),
+                      prefixIcon: const Icon(Icons.phone_android_outlined),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  ElevatedButton(
+                    onPressed: (_loggingIn || !backendReady) ? null : _continueWithPhone,
+                    child: _loggingIn
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : Text(localized.translate('login_continue')),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    localized.translate('login_mobile_access_note'),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: colorScheme.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 24),
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: (_loggingIn)
+                          ? null
+                          : () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const AdminLoginScreen()),
+                              );
+                            },
+                      icon: const Icon(Icons.admin_panel_settings_outlined, size: 18),
+                      label: const Text('Admin login'),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-            ],
-            Text(localized.translate('login_phone_label'), style: const TextStyle(fontSize: 18)),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _phoneController,
-              keyboardType: TextInputType.phone,
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9+]')),
-              ],
-              decoration: InputDecoration(
-                hintText: localized.translate('login_phone_hint'),
-                border: const OutlineInputBorder(),
-              ),
             ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: (_loggingIn || !backendReady) ? null : _continueWithPhone,
-              child: _loggingIn
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : Text(localized.translate('login_continue')),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              localized.translate('login_mobile_access_note'),
-              style: const TextStyle(color: Colors.black54),
-            ),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: (_loggingIn)
-                  ? null
-                  : () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const AdminLoginScreen()),
-                      );
-                    },
-              icon: const Icon(Icons.admin_panel_settings_outlined),
-              label: const Text('Admin login'),
-            ),
-          ],
+          ),
         ),
       ),
     );

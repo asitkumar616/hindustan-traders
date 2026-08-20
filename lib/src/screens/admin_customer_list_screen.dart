@@ -79,7 +79,6 @@ class _AdminCustomerListScreenState extends State<AdminCustomerListScreen> {
                   },
                   icon: const Icon(Icons.clear),
                 ),
-                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 14),

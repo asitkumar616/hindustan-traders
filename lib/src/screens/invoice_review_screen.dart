@@ -101,7 +101,7 @@ class _InvoiceReviewScreenState extends State<InvoiceReviewScreen> {
                   TextField(
                     controller: amountController,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'Payment amount', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'Payment amount'),
                   ),
                 ],
               ),

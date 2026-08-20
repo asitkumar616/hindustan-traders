@@ -48,6 +48,25 @@ class OrderService {
     return List<Map<String, dynamic>>.from(response as List);
   }
 
+  static Future<void> updateStatus(
+    String orderId,
+    String status, {
+    String? customerId,
+    String? businessId,
+  }) async {
+    await _client.from('orders').update({'status': status}).eq('id', orderId);
+
+    if (status == 'ready' && customerId != null && businessId != null) {
+      await _client.from('notifications').insert({
+        'recipient_id': customerId,
+        'business_id': businessId,
+        'title': 'Order packed',
+        'body': 'Your order is packed and ready for delivery.',
+        'data': {'order_id': orderId, 'status': status},
+      });
+    }
+  }
+
   static String formatDisplayDate(String? timestamp) {
     if (timestamp == null || timestamp.isEmpty) {
       return '—';

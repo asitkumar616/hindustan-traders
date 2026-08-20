@@ -85,7 +85,7 @@ create table if not exists orders (
   id uuid primary key default uuid_generate_v4(),
   customer_id uuid not null references profiles(id),
   business_id uuid not null references businesses(id),
-  status text not null default 'pending',
+  status text not null default 'pending' check (status in ('pending', 'ready', 'completed')),
   total_amount numeric not null,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
@@ -810,7 +810,7 @@ begin
   select
     b.id as business_id,
     b.name as business_name,
-    (select count(*) from customers c where c.business_id = b.id and c.is_active = true)::bigint as total_customers,
+    (select count(*) from customers c where c.business_id = b.id)::bigint as total_customers,
     (select count(*) from invoices i where i.business_id = b.id and i.status <> 'draft' and i.created_at >= date_trunc('day', now()))::bigint as today_orders,
     (select coalesce(sum(i.total), 0) from invoices i where i.business_id = b.id and i.status <> 'draft' and i.created_at >= date_trunc('day', now())) as today_revenue,
     (select coalesce(sum(i.balance_amount), 0) from invoices i where i.business_id = b.id and i.status <> 'paid') as pending_amount
@@ -936,6 +936,21 @@ alter table stock_movements enable row level security;
 
 create policy "profiles_select_own" on profiles
 for select using (auth.uid() = id);
+
+create policy "profiles_select_business_member" on profiles
+for select using (
+  exists (
+    select 1
+    from business_members bm_self
+    join business_members bm_target
+      on bm_target.business_id = bm_self.business_id
+    where bm_self.user_id = auth.uid()
+      and bm_self.status = 'active'
+      and bm_self.role in ('owner', 'staff')
+      and bm_target.user_id = profiles.id
+      and bm_target.status = 'active'
+  )
+);
 
 create policy "profiles_insert_own" on profiles
 for insert with check (auth.uid() = id);
@@ -1245,3 +1260,17 @@ for select using (
       and bm.status = 'active'
   )
 );
+
+create policy "notifications_insert_business_member" on notifications
+for insert with check (
+  exists (
+    select 1 from business_members bm
+    where bm.user_id = auth.uid()
+      and bm.business_id = notifications.business_id
+      and bm.status = 'active'
+  )
+);
+
+create policy "notifications_update_recipient" on notifications
+for update using (recipient_id = auth.uid())
+with check (recipient_id = auth.uid());

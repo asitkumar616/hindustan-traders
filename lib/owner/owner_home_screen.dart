@@ -121,18 +121,20 @@ class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
                 _isLoading
                     ? 'Loading your shop...'
                     : (_summary.businessName.isEmpty ? 'Business ready for orders.' : 'Managing: ${_summary.businessName}'),
-                style: const TextStyle(color: Colors.black54),
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
               if (_loadError != null) ...[
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.red.shade50,
+                    color: Theme.of(context).colorScheme.errorContainer,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.red.shade200),
                   ),
-                  child: Text('Unable to load dashboard: $_loadError', style: TextStyle(color: Colors.red.shade900)),
+                  child: Text(
+                    'Unable to load dashboard: $_loadError',
+                    style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
+                  ),
                 ),
               ],
               const SizedBox(height: 20),

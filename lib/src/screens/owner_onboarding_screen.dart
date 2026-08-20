@@ -72,7 +72,6 @@ class _OwnerOnboardingScreenState extends State<OwnerOnboardingScreen> {
               controller: _nameController,
               decoration: const InputDecoration(
                 labelText: 'Owner name',
-                border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 12),
@@ -80,7 +79,6 @@ class _OwnerOnboardingScreenState extends State<OwnerOnboardingScreen> {
               controller: _shopNameController,
               decoration: const InputDecoration(
                 labelText: 'Shop name',
-                border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 20),

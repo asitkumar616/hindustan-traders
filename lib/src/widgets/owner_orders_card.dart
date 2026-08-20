@@ -41,12 +41,32 @@ class _OwnerOrdersCardState extends State<OwnerOrdersCard> {
     });
   }
 
+  Future<void> _updateStatus(BuildContext context, Map<String, dynamic> order, String status) async {
+    try {
+      await OrderService.updateStatus(
+        order['id'] as String,
+        status,
+        customerId: order['customer_id'] as String?,
+        businessId: order['business_id'] as String?,
+      );
+      if (!mounted) return;
+      Navigator.pop(context);
+      await _loadOrders();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to update order: $error')),
+      );
+    }
+  }
+
   void _showOrderDetails(BuildContext context, Map<String, dynamic> order) {
     final customer = (order['customer'] as Map<String, dynamic>?) ?? <String, dynamic>{};
     final customerName = (customer['name'] as String?) ?? 'Customer';
     final customerPhone = (customer['phone'] as String?) ?? '';
     final items = (order['order_items'] as List<dynamic>?) ?? const <dynamic>[];
     final createdAt = OrderService.formatDisplayDate(order['created_at'] as String?);
+    final status = (order['status'] as String?) ?? 'pending';
 
     showModalBottomSheet<void>(
       context: context,
@@ -73,7 +93,7 @@ class _OwnerOrdersCardState extends State<OwnerOrdersCard> {
               const SizedBox(height: 6),
               Text('Placed: $createdAt'),
               const SizedBox(height: 8),
-              Text('${localized.translate('owner_order_detail_status')}: ${(order['status'] as String? ?? 'pending').toUpperCase()}'),
+              Text('${localized.translate('owner_order_detail_status')}: ${status.toUpperCase()}'),
               const SizedBox(height: 12),
               Text('Items:'),
               const SizedBox(height: 4),
@@ -94,9 +114,26 @@ class _OwnerOrdersCardState extends State<OwnerOrdersCard> {
               const SizedBox(height: 12),
               Text('Total: ₹${(order['total_amount'] as num? ?? 0).toStringAsFixed(0)}'),
               const SizedBox(height: 16),
+              if (status == 'pending')
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => _updateStatus(sheetContext, order, 'ready'),
+                    child: Text(localized.translate('owner_orders_mark_ready')),
+                  ),
+                )
+              else if (status == 'ready')
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => _updateStatus(sheetContext, order, 'completed'),
+                    child: Text(localized.translate('owner_orders_mark_complete')),
+                  ),
+                ),
+              const SizedBox(height: 8),
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
+                child: OutlinedButton(
                   onPressed: () => Navigator.pop(sheetContext),
                   child: Text(localized.translate('owner_order_detail_close')),
                 ),

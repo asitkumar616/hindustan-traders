@@ -74,7 +74,6 @@ class _AdminBusinessListScreenState extends State<AdminBusinessListScreen> {
                   },
                   icon: const Icon(Icons.clear),
                 ),
-                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 14),
