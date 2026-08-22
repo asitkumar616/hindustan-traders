@@ -1,3 +1,4 @@
+import '../models/cart_line.dart';
 import '../models/order_draft.dart';
 import '../models/order_item.dart';
 import 'auth_service.dart';
@@ -156,7 +157,7 @@ class OrderDraftService {
         await SupabaseService.client.from('order_items').insert(
           mappedProducts.map((item) => {
             'order_id': orderId,
-            'product_id': item['product_id'] ?? null,
+            'product_id': item['product_id'],
             'quantity': item['quantity'],
             'unit': item['unit'],
             'price': item['price'],
@@ -196,6 +197,77 @@ class OrderDraftService {
         savedLocally: true,
         message: 'Submission failed. Draft saved locally.',
       );
+    }
+  }
+
+  // Submits a cart built from real catalog selections (Shop Catalog / Cart
+  // screens): structured product_id + quantity + unit + price, written
+  // straight to orders/order_items. Deliberately separate from submitDraft
+  // above -- that path re-derives quantity/price through parseTranscript's
+  // keyword stub (only recognizes "rice"/"milk"/"egg" with fixed fake
+  // quantities), which would silently misprice a real cart. This mirrors
+  // submitDraft's own orders -> order_items -> invoice draft write sequence,
+  // just driven by real line items instead of the stub parser.
+  static Future<OrderSubmissionResult> submitCart({
+    required String businessId,
+    required List<CartLine> lines,
+  }) async {
+    if (lines.isEmpty) {
+      return const OrderSubmissionResult(success: false, message: 'Your cart is empty.');
+    }
+
+    final user = AuthService.currentUser;
+    if (user == null) {
+      return const OrderSubmissionResult(success: false, message: 'Please log in again to place this order.');
+    }
+
+    if (!SupabaseService.isInitialized) {
+      return const OrderSubmissionResult(success: false, message: 'Unable to reach the server. Please try again.');
+    }
+
+    try {
+      final totalAmount = lines.fold<double>(0, (sum, line) => sum + line.amount);
+
+      final orderResponse = await SupabaseService.client.from('orders').insert({
+        'customer_id': user.id,
+        'business_id': businessId,
+        'status': 'pending',
+        'total_amount': totalAmount,
+      }).select('id').single();
+
+      final orderId = orderResponse['id'] as String;
+
+      await SupabaseService.client.from('order_items').insert(
+        lines.map((line) => {
+          'order_id': orderId,
+          'product_id': line.productId,
+          'quantity': line.quantity,
+          'unit': line.unit,
+          'price': line.price,
+          'amount': line.amount,
+        }).toList(),
+      );
+
+      final invoiceDraft = await CustomerBusinessService.createInvoiceDraft(
+        businessId: businessId,
+        customerId: user.id,
+        orderId: orderId,
+        totalAmount: totalAmount,
+      );
+      if (invoiceDraft != null) {
+        await SupabaseService.client.from('notifications').insert({
+          'recipient_id': user.id,
+          'business_id': businessId,
+          'title': 'Invoice draft created',
+          'body': 'Invoice ${invoiceDraft['invoice_number']} is ready for review.',
+          'data': {'invoice_id': invoiceDraft['id']},
+        });
+        await SupabaseService.client.from('orders').update({'invoice_id': invoiceDraft['id']}).eq('id', orderId);
+      }
+
+      return const OrderSubmissionResult(success: true, message: 'Order placed successfully.');
+    } catch (_) {
+      return const OrderSubmissionResult(success: false, message: 'Unable to place your order. Please try again.');
     }
   }
 

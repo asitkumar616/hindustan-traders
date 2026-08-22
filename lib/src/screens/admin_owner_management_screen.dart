@@ -4,6 +4,18 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../services/admin_dashboard_service.dart';
 import '../services/auth_service.dart';
 import '../services/voice_owner_parser.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_radius.dart';
+import '../theme/app_spacing.dart';
+import '../theme/app_text_styles.dart';
+import '../widgets/app_card.dart';
+import '../widgets/app_empty_state.dart';
+import '../widgets/app_flat_bottom_nav.dart';
+import '../widgets/app_loading_state.dart';
+import '../widgets/app_primary_button.dart';
+import '../widgets/app_voice_bottom_nav.dart' show AppNavItem;
+import 'admin_business_list_screen.dart';
+import 'admin_customer_list_screen.dart';
 
 class AdminOwnerManagementScreen extends StatefulWidget {
   const AdminOwnerManagementScreen({super.key});
@@ -358,106 +370,224 @@ class _AdminOwnerManagementScreenState extends State<AdminOwnerManagementScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Owners'),
-        actions: [
-          IconButton(onPressed: _loadOwners, icon: const Icon(Icons.refresh)),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddOwnerDialog,
-        icon: const Icon(Icons.person_add_alt_1),
-        label: const Text('Add Owner'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
+      backgroundColor: AppColors.surfaceMuted,
+      body: SafeArea(
         child: Column(
           children: [
-            TextField(
-              controller: _searchController,
-              onSubmitted: (value) {
-                setState(() => _query = value.trim());
-                _loadOwners();
-              },
-              decoration: InputDecoration(
-                hintText: 'Search owners by name, phone, or business',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: IconButton(
-                  onPressed: () {
-                    _searchController.clear();
-                    setState(() => _query = '');
-                    _loadOwners();
-                  },
-                  icon: const Icon(Icons.clear),
-                ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.sm, AppSpacing.xl, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => Navigator.maybePop(context),
+                        icon: const Icon(Icons.arrow_back_rounded),
+                        color: AppColors.textPrimary,
+                      ),
+                      const Expanded(child: Text('Owners', style: AppTextStyles.heading)),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
+                    ),
+                    child: TextField(
+                      controller: _searchController,
+                      onSubmitted: (value) {
+                        setState(() => _query = value.trim());
+                        _loadOwners();
+                      },
+                      decoration: InputDecoration(
+                        hintText: 'Search owners by name, phone, or business',
+                        prefixIcon: const Icon(Icons.search_rounded),
+                        suffixIcon: IconButton(
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _query = '');
+                            _loadOwners();
+                          },
+                          icon: const Icon(Icons.clear),
+                        ),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        filled: false,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                ],
               ),
             ),
-            const SizedBox(height: 14),
             Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _owners.isEmpty
-                      ? const Center(child: Text('No owners found.'))
-                      : ListView.builder(
-                          itemCount: _owners.length,
-                          itemBuilder: (context, index) {
-                            final owner = _owners[index];
-                            final statusColor = switch (owner.approvalStatus) {
-                              'approved' => Colors.green,
-                              'rejected' => Colors.red,
-                              _ => Colors.orange,
-                            };
-
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 10),
-                              child: ListTile(
-                                title: Text(owner.ownerName, style: const TextStyle(fontWeight: FontWeight.w700)),
-                                subtitle: Text(
-                                  '${owner.ownerPhone}\n${owner.businessName}\nStatus: ${owner.approvalStatus.toUpperCase()} • ${owner.isActive ? 'ACTIVE' : 'INACTIVE'}\nCustomers: ${owner.customerCount}',
-                                ),
-                                isThreeLine: true,
-                                trailing: PopupMenuButton<String>(
-                                  onSelected: (value) {
-                                    if (value == 'edit') {
-                                      _showEditOwnerDialog(owner);
-                                      return;
-                                    }
-                                    if (value == 'approve') {
-                                      _setOwnerState(owner, status: 'approved', isActive: true);
-                                      return;
-                                    }
-                                    if (value == 'reject') {
-                                      _setOwnerState(owner, status: 'rejected', isActive: false);
-                                      return;
-                                    }
-                                    if (value == 'activate') {
-                                      _setOwnerState(owner, status: owner.approvalStatus, isActive: true);
-                                      return;
-                                    }
-                                    if (value == 'deactivate') {
-                                      _setOwnerState(owner, status: owner.approvalStatus, isActive: false);
-                                    }
-                                  },
-                                  itemBuilder: (_) => const [
-                                    PopupMenuItem(value: 'edit', child: Text('Edit owner')),
-                                    PopupMenuItem(value: 'approve', child: Text('Approve')),
-                                    PopupMenuItem(value: 'reject', child: Text('Reject')),
-                                    PopupMenuItem(value: 'activate', child: Text('Activate')),
-                                    PopupMenuItem(value: 'deactivate', child: Text('Deactivate')),
-                                  ],
-                                ),
-                                leading: CircleAvatar(
-                                  backgroundColor: statusColor.withValues(alpha: 0.15),
-                                  child: Icon(Icons.storefront, color: statusColor),
+              child: RefreshIndicator(
+                onRefresh: _loadOwners,
+                child: _loading
+                    ? const AppLoadingState()
+                    : ListView(
+                        padding: const EdgeInsets.fromLTRB(AppSpacing.xl, 0, AppSpacing.xl, AppSpacing.xl),
+                        children: [
+                          if (_owners.isEmpty)
+                            const AppEmptyState(icon: Icons.manage_accounts_outlined, title: 'No Owners Found', message: 'Try a different search, or add a new owner.')
+                          else
+                            ..._owners.map(
+                              (owner) => Padding(
+                                padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                                child: _OwnerCard(
+                                  owner: owner,
+                                  onEdit: () => _showEditOwnerDialog(owner),
+                                  onApprove: () => _setOwnerState(owner, status: 'approved', isActive: true),
+                                  onReject: () => _setOwnerState(owner, status: 'rejected', isActive: false),
+                                  onActivate: () => _setOwnerState(owner, status: owner.approvalStatus, isActive: true),
+                                  onDeactivate: () => _setOwnerState(owner, status: owner.approvalStatus, isActive: false),
                                 ),
                               ),
-                            );
-                          },
-                        ),
+                            ),
+                        ],
+                      ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpacing.xl, 0, AppSpacing.xl, AppSpacing.xl),
+              child: AppPrimaryButton(label: 'Add Owner', icon: Icons.person_add_alt_1, onPressed: _showAddOwnerDialog),
             ),
           ],
         ),
       ),
+      bottomNavigationBar: AppFlatBottomNav(
+        accentColor: AppColors.adminPrimary,
+        items: [
+          AppNavItem(icon: Icons.dashboard_rounded, label: 'Dashboard', onTap: () => Navigator.maybePop(context)),
+          const AppNavItem(icon: Icons.manage_accounts_rounded, label: 'Owners', active: true),
+          AppNavItem(icon: Icons.store_mall_directory_outlined, label: 'Businesses', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminBusinessListScreen()))),
+          AppNavItem(icon: Icons.groups_2_outlined, label: 'Customers', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminCustomerListScreen(onlyActive: false)))),
+        ],
+      ),
     );
   }
+}
+
+class _OwnerCard extends StatelessWidget {
+  const _OwnerCard({
+    required this.owner,
+    required this.onEdit,
+    required this.onApprove,
+    required this.onReject,
+    required this.onActivate,
+    required this.onDeactivate,
+  });
+
+  final AdminOwnerRecord owner;
+  final VoidCallback onEdit;
+  final VoidCallback onApprove;
+  final VoidCallback onReject;
+  final VoidCallback onActivate;
+  final VoidCallback onDeactivate;
+
+  @override
+  Widget build(BuildContext context) {
+    final statusStyle = _statusStyleFor(owner.approvalStatus);
+
+    return AppCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(color: statusStyle.fg.withValues(alpha: 0.12), shape: BoxShape.circle),
+            child: Icon(Icons.storefront_rounded, color: statusStyle.fg),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(owner.ownerName, style: AppTextStyles.subheading),
+                const SizedBox(height: 2),
+                Text(owner.businessName, style: AppTextStyles.bodyMuted),
+                const SizedBox(height: 2),
+                Text(owner.ownerPhone, style: AppTextStyles.bodyMuted),
+                const SizedBox(height: AppSpacing.sm),
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: 4,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(color: statusStyle.bg, borderRadius: BorderRadius.circular(AppRadius.pill)),
+                      child: Text(statusStyle.label, style: TextStyle(color: statusStyle.fg, fontSize: 11, fontWeight: FontWeight.w700)),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: owner.isActive ? const Color(0xFFE1F7E8) : AppColors.divider,
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                      ),
+                      child: Text(
+                        owner.isActive ? 'Active' : 'Inactive',
+                        style: TextStyle(
+                          color: owner.isActive ? const Color(0xFF2E7D32) : AppColors.textSecondary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert_rounded, color: AppColors.textSecondary),
+            onSelected: (value) {
+              switch (value) {
+                case 'edit':
+                  onEdit();
+                case 'approve':
+                  onApprove();
+                case 'reject':
+                  onReject();
+                case 'activate':
+                  onActivate();
+                case 'deactivate':
+                  onDeactivate();
+              }
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'edit', child: Text('Edit owner')),
+              PopupMenuItem(value: 'approve', child: Text('Approve')),
+              PopupMenuItem(value: 'reject', child: Text('Reject')),
+              PopupMenuItem(value: 'activate', child: Text('Activate')),
+              PopupMenuItem(value: 'deactivate', child: Text('Deactivate')),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  _StatusStyle _statusStyleFor(String status) {
+    switch (status) {
+      case 'approved':
+        return const _StatusStyle('Approved', Color(0xFFE1F7E8), Color(0xFF2E7D32));
+      case 'rejected':
+        return const _StatusStyle('Rejected', Color(0xFFFCE4E4), Color(0xFFC62828));
+      default:
+        return const _StatusStyle('Pending', Color(0xFFFFF1DC), Color(0xFFC9820A));
+    }
+  }
+}
+
+class _StatusStyle {
+  const _StatusStyle(this.label, this.bg, this.fg);
+  final String label;
+  final Color bg;
+  final Color fg;
 }

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:speech_to_text/speech_recognition_error.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../localization/app_localizations.dart';
 import '../models/order_draft.dart';
 import '../services/order_draft_service.dart';
+import 'app_sound_level_meter.dart';
 import 'order_draft_summary.dart';
 
 class VoiceOrderCard extends StatefulWidget {
@@ -23,6 +25,7 @@ class _VoiceOrderCardState extends State<VoiceOrderCard> {
   bool _isSubmitting = false;
   String _liveTranscript = '';
   String _status = '';
+  double _soundLevel = 0;
 
   // The running cart for this shop. Each recognized utterance adds items
   // to this list rather than replacing it -- this is what lets the
@@ -40,12 +43,80 @@ class _VoiceOrderCardState extends State<VoiceOrderCard> {
     _initSpeech();
   }
 
+  @override
+  void dispose() {
+    if (_speech.isListening) {
+      _speech.stop();
+    }
+    super.dispose();
+  }
+
   Future<void> _initSpeech() async {
-    final available = await _speech.initialize();
+    final available = await _speech.initialize(
+      onError: _handleSpeechError,
+      onStatus: _handleSpeechStatus,
+    );
     if (!available && mounted) {
       setState(() {
         _status = AppLocalizations.of(context).translate('voice_order_speech_unavailable');
       });
+    }
+  }
+
+  // speech_to_text stops listening (e.g. after the pause/listen timeouts
+  // elapse, or when the platform recognizer finishes) without necessarily
+  // ever delivering a final onResult. Without this, `_isRecording` could
+  // stay true forever and the mic button would look stuck on "Recording..."
+  // even though nothing is being captured any more.
+  void _handleSpeechStatus(String status) {
+    if (!mounted) return;
+    if (status == stt.SpeechToText.doneStatus || status == stt.SpeechToText.notListeningStatus) {
+      if (_isRecording) {
+        setState(() {
+          _isRecording = false;
+          if (_liveTranscript.isEmpty) {
+            _status = "Didn't catch anything. Tap the mic and try again.";
+          }
+        });
+      }
+    }
+  }
+
+  void _handleSpeechError(SpeechRecognitionError error) {
+    if (!mounted) return;
+    setState(() {
+      _isRecording = false;
+      _status = _friendlyErrorMessage(error.errorMsg);
+    });
+  }
+
+  // Android/iOS report `error_*` codes; the web implementation forwards the
+  // browser's raw Web Speech API codes (`not-allowed`, `no-speech`, ...)
+  // unprefixed. Both are handled here since this widget runs on both.
+  String _friendlyErrorMessage(String errorMsg) {
+    switch (errorMsg) {
+      case 'error_permission':
+      case 'not-allowed':
+      case 'service-not-allowed':
+        return AppLocalizations.of(context).translate('voice_order_permission_denied');
+      case 'error_no_match':
+      case 'error_speech_timeout':
+      case 'no-speech':
+        return "Didn't catch anything. Tap the mic and try again.";
+      case 'error_network':
+      case 'error_network_timeout':
+      case 'network':
+        return 'No internet connection. Voice recognition needs data/Wi-Fi.';
+      case 'error_audio_error':
+      case 'audio-capture':
+        return 'Microphone error. Check that a mic is connected and not in use by another app.';
+      case 'error_busy':
+        return 'Voice recognition is busy. Please try again in a moment.';
+      case 'not supported':
+      case 'speech_not_supported':
+        return 'Voice recognition is not supported on this browser/device. Try Chrome or a supported mobile device.';
+      default:
+        return 'Something went wrong while listening. Please try again.';
     }
   }
 
@@ -82,6 +153,7 @@ class _VoiceOrderCardState extends State<VoiceOrderCard> {
       _isRecording = true;
       _status = localized.translate('voice_order_recording');
       _liveTranscript = '';
+      _soundLevel = 0;
     });
 
     await _speech.listen(
@@ -95,8 +167,12 @@ class _VoiceOrderCardState extends State<VoiceOrderCard> {
           }
         });
       },
-      listenFor: const Duration(seconds: 10),
-      pauseFor: const Duration(seconds: 3),
+      onSoundLevelChange: (level) {
+        if (!mounted) return;
+        setState(() => _soundLevel = level);
+      },
+      listenFor: const Duration(seconds: 20),
+      pauseFor: const Duration(seconds: 5),
       partialResults: true,
     );
   }
@@ -190,6 +266,10 @@ class _VoiceOrderCardState extends State<VoiceOrderCard> {
                     : (_hasCartItems ? 'Add more items' : localized.translate('voice_order_button')),
               ),
             ),
+            if (_isRecording) ...[
+              const SizedBox(height: 12),
+              AppSoundLevelMeter(level: _soundLevel, activeColor: Colors.green.shade500),
+            ],
             const SizedBox(height: 12),
             if (_status.isNotEmpty)
               Text(
@@ -251,3 +331,4 @@ class _VoiceOrderCardState extends State<VoiceOrderCard> {
     );
   }
 }
+

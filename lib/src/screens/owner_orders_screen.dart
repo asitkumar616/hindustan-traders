@@ -1,5 +1,20 @@
 import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
 import '../services/order_service.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_radius.dart';
+import '../theme/app_spacing.dart';
+import '../theme/app_text_styles.dart';
+import '../utils/formatters.dart';
+import '../widgets/app_card.dart';
+import '../widgets/app_empty_state.dart';
+import '../widgets/app_filter_chip.dart';
+import '../widgets/app_loading_state.dart';
+import '../widgets/app_voice_bottom_nav.dart';
+import '../widgets/owner_nav_drawer.dart';
+import '../widgets/voice_order_card.dart';
+import 'login_screen.dart';
+import 'owner_product_management_screen.dart';
 
 class OwnerOrdersScreen extends StatefulWidget {
   const OwnerOrdersScreen({super.key, required this.businessId, this.todayOnly = false});
@@ -12,8 +27,10 @@ class OwnerOrdersScreen extends StatefulWidget {
 }
 
 class _OwnerOrdersScreenState extends State<OwnerOrdersScreen> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _loading = true;
   List<Map<String, dynamic>> _orders = const <Map<String, dynamic>>[];
+  String _statusFilter = 'all';
 
   @override
   void initState() {
@@ -145,40 +162,226 @@ class _OwnerOrdersScreenState extends State<OwnerOrdersScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.todayOnly ? "Today's Orders" : 'Orders'),
-        actions: [
-          IconButton(onPressed: _loadOrders, icon: const Icon(Icons.refresh)),
-        ],
+  void _showVoiceOrderSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: SafeArea(top: false, child: VoiceOrderCard(businessId: widget.businessId)),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _orders.isEmpty
-              ? Center(child: Text(widget.todayOnly ? 'No orders placed today yet.' : 'No orders yet.'))
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _orders.length,
-                  itemBuilder: (_, index) {
-                    final order = _orders[index];
-                    final customer = (order['customer'] as Map<String, dynamic>?) ?? <String, dynamic>{};
-                    final customerName = (customer['name'] as String?) ?? 'Customer';
-                    final createdAt = OrderService.formatDisplayDate(order['created_at'] as String?);
-                    final status = ((order['status'] as String?) ?? 'pending').toUpperCase();
-
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      child: ListTile(
-                        title: Text('From: $customerName'),
-                        subtitle: Text('$createdAt • ₹${(order['total_amount'] as num? ?? 0).toStringAsFixed(0)}'),
-                        trailing: Chip(label: Text(status), visualDensity: VisualDensity.compact),
-                        onTap: () => _showOrderDetails(order),
-                      ),
-                    );
-                  },
-                ),
     );
   }
+
+  @override
+  Widget build(BuildContext context) {
+    final filteredOrders = _statusFilter == 'all'
+        ? _orders
+        : _orders.where((order) => (order['status'] as String? ?? 'pending') == _statusFilter).toList();
+
+    return Scaffold(
+      key: _scaffoldKey,
+      backgroundColor: AppColors.surfaceMuted,
+      drawer: OwnerNavDrawer(
+        businessId: widget.businessId,
+        onDashboard: () {
+          Navigator.pop(context);
+          Navigator.pop(context);
+        },
+        onNavigate: (screen) {
+          Navigator.pop(context);
+          Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+        },
+        onLogout: () async {
+          Navigator.pop(context);
+          await AuthService.signOut();
+          if (!mounted) return;
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
+            (route) => false,
+          );
+        },
+      ),
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpacing.sm, AppSpacing.sm, AppSpacing.xl, 0),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.maybePop(context),
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    color: AppColors.textPrimary,
+                  ),
+                  Expanded(
+                    child: Text(widget.todayOnly ? "Today's Orders" : 'Orders', style: AppTextStyles.heading),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            SizedBox(
+              height: 36,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+                children: [
+                  AppFilterChip(
+                    label: 'All',
+                    selected: _statusFilter == 'all',
+                    selectedColor: AppColors.ownerPrimary,
+                    onTap: () => setState(() => _statusFilter = 'all'),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  AppFilterChip(
+                    label: 'Pending',
+                    selected: _statusFilter == 'pending',
+                    selectedColor: AppColors.ownerPrimary,
+                    onTap: () => setState(() => _statusFilter = 'pending'),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  AppFilterChip(
+                    label: 'Ready',
+                    selected: _statusFilter == 'ready',
+                    selectedColor: AppColors.ownerPrimary,
+                    onTap: () => setState(() => _statusFilter = 'ready'),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  AppFilterChip(
+                    label: 'Completed',
+                    selected: _statusFilter == 'completed',
+                    selectedColor: AppColors.ownerPrimary,
+                    onTap: () => setState(() => _statusFilter = 'completed'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: _loadOrders,
+                child: _loading
+                    ? const AppLoadingState()
+                    : ListView(
+                        padding: const EdgeInsets.fromLTRB(AppSpacing.xl, 0, AppSpacing.xl, AppSpacing.xl),
+                        children: [
+                          if (filteredOrders.isEmpty)
+                            AppEmptyState(
+                              icon: Icons.receipt_long_outlined,
+                              title: 'No Orders',
+                              message: widget.todayOnly ? 'No orders placed today yet.' : 'No orders match this filter yet.',
+                            )
+                          else
+                            ...filteredOrders.map(
+                              (order) => Padding(
+                                padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                                child: _OwnerOrderCard(order: order, onTap: () => _showOrderDetails(order)),
+                              ),
+                            ),
+                        ],
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: AppVoiceBottomNav(
+        accentDark: AppColors.ownerPrimaryDark,
+        accentLight: AppColors.ownerPrimaryLight,
+        leftItems: [
+          AppNavItem(icon: Icons.home_rounded, label: 'Home', onTap: () => Navigator.maybePop(context)),
+          AppNavItem(
+            icon: Icons.inventory_2_outlined,
+            label: 'Products',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => OwnerProductManagementScreen(businessId: widget.businessId)),
+            ),
+          ),
+        ],
+        rightItems: [
+          const AppNavItem(icon: Icons.receipt_long_rounded, label: 'Orders', active: true),
+          AppNavItem(icon: Icons.more_horiz_rounded, label: 'More', onTap: () => _scaffoldKey.currentState?.openDrawer()),
+        ],
+        onVoice: _showVoiceOrderSheet,
+      ),
+    );
+  }
+}
+
+class _OwnerOrderCard extends StatelessWidget {
+  const _OwnerOrderCard({required this.order, required this.onTap});
+
+  final Map<String, dynamic> order;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final customer = (order['customer'] as Map<String, dynamic>?) ?? const <String, dynamic>{};
+    final customerName = (customer['name'] as String?)?.isNotEmpty == true ? customer['name'] as String : 'Customer';
+    final items = (order['order_items'] as List<dynamic>?) ?? const <dynamic>[];
+    final amount = (order['total_amount'] as num?) ?? 0;
+    final status = (order['status'] as String?) ?? 'pending';
+    final placedAt = OrderService.formatDisplayDate(order['created_at'] as String?);
+    final orderNumber = (order['id']?.toString() ?? '').replaceAll('-', '');
+    final shortNumber = orderNumber.length >= 6 ? orderNumber.substring(0, 6).toUpperCase() : orderNumber.toUpperCase();
+    final statusStyle = _statusStyleFor(status);
+
+    return AppCard(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('Order #$shortNumber', style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+              const Spacer(),
+              Text('₹${formatIndianAmount(amount)}', style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(customerName, style: AppTextStyles.subheading),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: Text('$placedAt · ${items.length} Items', style: AppTextStyles.bodyMuted, overflow: TextOverflow.ellipsis),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(color: statusStyle.bg, borderRadius: BorderRadius.circular(AppRadius.pill)),
+                child: Text(statusStyle.label, style: TextStyle(color: statusStyle.fg, fontSize: 11, fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  _StatusStyle _statusStyleFor(String status) {
+    switch (status) {
+      case 'pending':
+        return const _StatusStyle('Pending', Color(0xFFFFF1DC), Color(0xFFC9820A));
+      case 'ready':
+        return const _StatusStyle('Ready', Color(0xFFE1F0FF), Color(0xFF3B82F6));
+      case 'completed':
+        return const _StatusStyle('Completed', Color(0xFFE1F7E8), Color(0xFF2E7D32));
+      case 'cancelled':
+        return const _StatusStyle('Cancelled', Color(0xFFFCE4E4), Color(0xFFC62828));
+      default:
+        return _StatusStyle(status, AppColors.divider, AppColors.textSecondary);
+    }
+  }
+}
+
+class _StatusStyle {
+  const _StatusStyle(this.label, this.bg, this.fg);
+  final String label;
+  final Color bg;
+  final Color fg;
 }

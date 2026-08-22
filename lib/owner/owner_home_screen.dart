@@ -1,16 +1,23 @@
 import 'package:flutter/material.dart';
-import '../src/localization/app_localizations.dart';
 import '../src/screens/login_screen.dart';
-import '../src/screens/owner_coming_soon_screen.dart';
 import '../src/screens/owner_customer_management_screen.dart';
-import '../src/screens/owner_invoices_screen.dart';
 import '../src/screens/owner_orders_screen.dart';
 import '../src/screens/owner_product_management_screen.dart';
 import '../src/screens/owner_transactions_screen.dart';
 import '../src/services/auth_service.dart';
-import '../src/services/customer_business_service.dart';
+import '../src/services/order_service.dart';
 import '../src/services/owner_dashboard_service.dart';
-import '../src/widgets/owner_orders_card.dart';
+import '../src/theme/app_colors.dart';
+import '../src/theme/app_radius.dart';
+import '../src/theme/app_spacing.dart';
+import '../src/utils/formatters.dart';
+import '../src/widgets/app_card.dart';
+import '../src/widgets/app_empty_state.dart';
+import '../src/widgets/app_error_state.dart';
+import '../src/widgets/app_loading_state.dart';
+import '../src/widgets/app_voice_bottom_nav.dart';
+import '../src/widgets/notifications_card.dart';
+import '../src/widgets/owner_nav_drawer.dart';
 import '../src/widgets/voice_order_card.dart';
 
 class OwnerHomeScreen extends StatefulWidget {
@@ -21,11 +28,11 @@ class OwnerHomeScreen extends StatefulWidget {
 }
 
 class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
-  final GlobalKey _voiceOrderKey = GlobalKey();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   String? _ownerName;
   OwnerDashboardSummary _summary = OwnerDashboardSummary.empty;
-  List<Map<String, dynamic>> _productPreview = const <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> _orders = const <Map<String, dynamic>>[];
   bool _isLoading = true;
   String? _loadError;
 
@@ -44,15 +51,15 @@ class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
     try {
       final profile = await AuthService.getCurrentProfile();
       final summary = await OwnerDashboardService.fetchSummary();
-      final products = summary.businessId.isEmpty
+      final orders = summary.businessId.isEmpty
           ? const <Map<String, dynamic>>[]
-          : await CustomerBusinessService.getProductsForBusiness(summary.businessId);
+          : await OrderService.getOrdersForBusiness(summary.businessId);
 
       if (!mounted) return;
       setState(() {
         _ownerName = profile?.name;
         _summary = summary;
-        _productPreview = products.take(3).toList();
+        _orders = orders;
       });
     } catch (error) {
       if (!mounted) return;
@@ -78,310 +85,435 @@ class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
     Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
   }
 
-  void _scrollToVoiceOrder() {
-    final voiceContext = _voiceOrderKey.currentContext;
-    if (voiceContext != null) {
-      Scrollable.ensureVisible(voiceContext, duration: const Duration(milliseconds: 300));
-    }
+  void _openMenu() {
+    _scaffoldKey.currentState?.openDrawer();
+  }
+
+  void _showNotifications() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: SafeArea(
+          top: false,
+          child: NotificationsCard(businessId: _summary.businessId),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final localized = AppLocalizations.of(context);
     final businessId = _summary.businessId;
     final hasBusiness = businessId.isNotEmpty && !_isLoading;
+    final pendingOrders = _orders.where((order) => (order['status'] as String? ?? 'pending') != 'completed').length;
+    final recentOrders = _orders.take(3).toList();
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(localized.translate('owner_home_title')),
-        actions: [
-          IconButton(onPressed: _loadDashboard, icon: const Icon(Icons.refresh)),
-          IconButton(onPressed: _logout, icon: const Icon(Icons.logout), tooltip: 'Logout'),
-        ],
-      ),
-      drawer: _OwnerNavDrawer(
+      key: _scaffoldKey,
+      backgroundColor: AppColors.surfaceMuted,
+      drawer: OwnerNavDrawer(
         businessId: businessId,
+        onDashboard: () => Navigator.pop(context),
         onNavigate: (screen) {
           Navigator.pop(context);
-          if (screen != null) _push(screen);
+          _push(screen);
+        },
+        onLogout: () {
+          Navigator.pop(context);
+          _logout();
         },
       ),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _loadDashboard,
           child: ListView(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.sm, AppSpacing.xl, AppSpacing.xxl),
             children: [
-              Text(
-                'Welcome, ${_ownerName?.isNotEmpty == true ? _ownerName : 'Owner'}',
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                _isLoading
-                    ? 'Loading your shop...'
-                    : (_summary.businessName.isEmpty ? 'Business ready for orders.' : 'Managing: ${_summary.businessName}'),
-                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
-              ),
-              if (_loadError != null) ...[
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.errorContainer,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    'Unable to load dashboard: $_loadError',
-                    style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 20),
-              _SummaryGrid(
-                summary: _summary,
-                onTotalCustomers: () => _push(OwnerCustomerManagementScreen(businessId: businessId)),
-                onTodayOrders: () => _push(OwnerOrdersScreen(businessId: businessId, todayOnly: true)),
-                onTodayRevenue: () => _push(OwnerTransactionsScreen(businessId: businessId, todayOnly: true)),
-                onPendingAmount: () => _push(OwnerCustomerManagementScreen(businessId: businessId, onlyOutstanding: true)),
-              ),
-              const SizedBox(height: 24),
-              const Text('Quick Actions', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 10),
-              _QuickActionsGrid(
-                enabled: hasBusiness,
-                onAddCustomer: () => _push(OwnerCustomerManagementScreen(businessId: businessId)),
-                onAddProduct: () => _push(OwnerProductManagementScreen(businessId: businessId, autoOpenAdd: true)),
-                onNewOrder: _scrollToVoiceOrder,
-                onViewInvoices: () => _push(OwnerInvoicesScreen(businessId: businessId)),
-              ),
-              const SizedBox(height: 24),
-              const Text("Today's Orders", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 10),
-              const OwnerOrdersCard(),
-              const SizedBox(height: 24),
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Expanded(child: Text('Products', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
-                  TextButton(
-                    onPressed: hasBusiness ? () => _push(OwnerProductManagementScreen(businessId: businessId)) : null,
-                    child: const Text('View All Products'),
+                  IconButton(
+                    onPressed: _openMenu,
+                    icon: const Icon(Icons.menu_rounded),
+                    color: AppColors.textPrimary,
+                  ),
+                  IconButton(
+                    onPressed: _showNotifications,
+                    icon: const Icon(Icons.notifications_none_rounded),
+                    color: AppColors.textPrimary,
                   ),
                 ],
               ),
-              if (_productPreview.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 8),
-                  child: Text('No products added yet.', style: TextStyle(color: Colors.black54)),
+              Row(
+                children: [
+                  const Icon(Icons.storefront_rounded, size: 18, color: AppColors.ownerPrimary),
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(
+                    child: Text(
+                      _summary.businessName.isEmpty
+                          ? (_ownerName?.isNotEmpty == true ? _ownerName! : 'Your Shop')
+                          : _summary.businessName,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              if (_loadError != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                AppErrorState(
+                  message: 'Something went wrong. Unable to load your dashboard.',
+                  onRetry: _loadDashboard,
+                ),
+              ],
+              const SizedBox(height: AppSpacing.xl),
+              _RevenueHeroCard(
+                amount: _summary.todayRevenue,
+                loading: _isLoading,
+                onTap: hasBusiness
+                    ? () => _push(OwnerTransactionsScreen(businessId: businessId, todayOnly: true))
+                    : null,
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              _StatGrid(
+                summary: _summary,
+                pendingOrders: pendingOrders,
+                onTapCustomers: () => _push(OwnerCustomerManagementScreen(businessId: businessId)),
+                onTapOrders: () => _push(OwnerOrdersScreen(businessId: businessId, todayOnly: true)),
+                onTapPending: () => _push(OwnerOrdersScreen(businessId: businessId)),
+                onTapPendingAmount: () => _push(OwnerCustomerManagementScreen(businessId: businessId, onlyOutstanding: true)),
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Recent Orders', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                  TextButton(
+                    onPressed: hasBusiness ? () => _push(OwnerOrdersScreen(businessId: businessId)) : null,
+                    child: const Text('View All'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              if (_isLoading)
+                const AppLoadingState()
+              else if (recentOrders.isEmpty)
+                const AppEmptyState(
+                  icon: Icons.receipt_long_outlined,
+                  title: 'No Orders Yet',
+                  message: 'Orders placed by your customers will show up here.',
                 )
               else
-                ..._productPreview.map((product) => Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        title: Text(product['name']?.toString() ?? 'Product'),
-                        subtitle: Text(
-                          '${product['unit']?.toString() ?? 'unit'} • ₹${(product['price'] as num? ?? 0).toStringAsFixed(0)}',
-                        ),
-                      ),
-                    )),
-              const SizedBox(height: 24),
-              KeyedSubtree(key: _voiceOrderKey, child: const VoiceOrderCard()),
+                ...recentOrders.map(
+                  (order) => Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                    child: _RecentOrderCard(
+                      order: order,
+                      onTap: () => _push(OwnerOrdersScreen(businessId: businessId)),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
       ),
-    );
-  }
-}
-
-class _SummaryGrid extends StatelessWidget {
-  const _SummaryGrid({
-    required this.summary,
-    required this.onTotalCustomers,
-    required this.onTodayOrders,
-    required this.onTodayRevenue,
-    required this.onPendingAmount,
-  });
-
-  final OwnerDashboardSummary summary;
-  final VoidCallback onTotalCustomers;
-  final VoidCallback onTodayOrders;
-  final VoidCallback onTodayRevenue;
-  final VoidCallback onPendingAmount;
-
-  @override
-  Widget build(BuildContext context) {
-    final metrics = [
-      _MetricConfig(label: 'Total Customers', value: summary.totalCustomers.toString(), icon: Icons.groups_2, color: Colors.indigo, onTap: onTotalCustomers),
-      _MetricConfig(label: "Today's Orders", value: summary.todayOrders.toString(), icon: Icons.receipt_long, color: Colors.teal, onTap: onTodayOrders),
-      _MetricConfig(label: "Today's Revenue", value: '₹${summary.todayRevenue.toStringAsFixed(0)}', icon: Icons.trending_up, color: Colors.green, onTap: onTodayRevenue),
-      _MetricConfig(label: 'Pending Amount', value: '₹${summary.pendingAmount.toStringAsFixed(0)}', icon: Icons.hourglass_bottom, color: Colors.orange, onTap: onPendingAmount),
-    ];
-
-    return GridView.builder(
-      itemCount: metrics.length,
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: MediaQuery.of(context).size.width >= 700 ? 2 : 1,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 2.55,
-      ),
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemBuilder: (context, index) {
-        final metric = metrics[index];
-        return Card(
-          elevation: 1,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: metric.onTap,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Row(
-                children: [
-                  CircleAvatar(backgroundColor: metric.color.withValues(alpha: 0.12), child: Icon(metric.icon, color: metric.color)),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(metric.value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-                        Text(metric.label, style: const TextStyle(color: Colors.black54)),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right, color: Colors.black38),
-                ],
-              ),
-            ),
+      bottomNavigationBar: AppVoiceBottomNav(
+        accentDark: AppColors.ownerPrimaryDark,
+        accentLight: AppColors.ownerPrimaryLight,
+        leftItems: [
+          const AppNavItem(icon: Icons.home_rounded, label: 'Home', active: true),
+          AppNavItem(
+            icon: Icons.inventory_2_outlined,
+            label: 'Products',
+            onTap: hasBusiness ? () => _push(OwnerProductManagementScreen(businessId: businessId)) : null,
           ),
-        );
-      },
-    );
-  }
-}
-
-class _MetricConfig {
-  const _MetricConfig({required this.label, required this.value, required this.icon, required this.color, required this.onTap});
-
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-}
-
-class _QuickActionsGrid extends StatelessWidget {
-  const _QuickActionsGrid({
-    required this.enabled,
-    required this.onAddCustomer,
-    required this.onAddProduct,
-    required this.onNewOrder,
-    required this.onViewInvoices,
-  });
-
-  final bool enabled;
-  final VoidCallback onAddCustomer;
-  final VoidCallback onAddProduct;
-  final VoidCallback onNewOrder;
-  final VoidCallback onViewInvoices;
-
-  @override
-  Widget build(BuildContext context) {
-    final actions = [
-      (label: 'Add Customer', icon: Icons.person_add_alt_1, onTap: onAddCustomer),
-      (label: 'Add Product', icon: Icons.add_box_outlined, onTap: onAddProduct),
-      (label: 'New Order', icon: Icons.mic, onTap: onNewOrder),
-      (label: 'View Invoices', icon: Icons.receipt_outlined, onTap: onViewInvoices),
-    ];
-
-    return GridView.builder(
-      itemCount: actions.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-        childAspectRatio: 2.6,
+        ],
+        rightItems: [
+          AppNavItem(
+            icon: Icons.receipt_long_outlined,
+            label: 'Orders',
+            onTap: hasBusiness ? () => _push(OwnerOrdersScreen(businessId: businessId)) : null,
+          ),
+          AppNavItem(icon: Icons.more_horiz_rounded, label: 'More', onTap: _openMenu),
+        ],
+        onVoice: () => _showVoiceOrderSheet(businessId),
       ),
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemBuilder: (context, index) {
-        final action = actions[index];
-        return OutlinedButton.icon(
-          onPressed: enabled ? action.onTap : null,
-          icon: Icon(action.icon, size: 18),
-          label: Text(action.label, overflow: TextOverflow.ellipsis),
-        );
-      },
+    );
+  }
+
+  void _showVoiceOrderSheet(String businessId) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: SafeArea(top: false, child: VoiceOrderCard(businessId: businessId.isEmpty ? null : businessId)),
+      ),
     );
   }
 }
 
-class _OwnerNavDrawer extends StatelessWidget {
-  const _OwnerNavDrawer({required this.businessId, required this.onNavigate});
+class _RevenueHeroCard extends StatelessWidget {
+  const _RevenueHeroCard({required this.amount, required this.loading, this.onTap});
 
-  final String businessId;
-  final void Function(Widget? screen) onNavigate;
+  final double amount;
+  final bool loading;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Drawer(
-      child: SafeArea(
-        child: ListView(
-          padding: EdgeInsets.zero,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [AppColors.ownerPrimaryDark, AppColors.ownerPrimaryLight],
+          ),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.ownerPrimary.withValues(alpha: 0.35),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const DrawerHeader(
-              child: Align(
-                alignment: Alignment.bottomLeft,
-                child: Text('Owner Menu', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  "TODAY'S REVENUE",
+                  style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.6),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.15), shape: BoxShape.circle),
+                  child: const Icon(Icons.show_chart_rounded, color: Colors.white, size: 18),
+                ),
+              ],
             ),
-            ListTile(leading: const Icon(Icons.dashboard_outlined), title: const Text('Dashboard'), onTap: () => onNavigate(null)),
-            ListTile(
-              leading: const Icon(Icons.groups_2_outlined),
-              title: const Text('Customers'),
-              onTap: () => onNavigate(OwnerCustomerManagementScreen(businessId: businessId)),
-            ),
-            ListTile(
-              leading: const Icon(Icons.inventory_2_outlined),
-              title: const Text('Products'),
-              onTap: () => onNavigate(OwnerProductManagementScreen(businessId: businessId)),
-            ),
-            ListTile(
-              leading: const Icon(Icons.receipt_long_outlined),
-              title: const Text('Orders'),
-              onTap: () => onNavigate(OwnerOrdersScreen(businessId: businessId)),
-            ),
-            ListTile(
-              leading: const Icon(Icons.description_outlined),
-              title: const Text('Invoices'),
-              onTap: () => onNavigate(OwnerInvoicesScreen(businessId: businessId)),
-            ),
-            ListTile(
-              leading: const Icon(Icons.swap_horiz_outlined),
-              title: const Text('Transactions'),
-              onTap: () => onNavigate(OwnerTransactionsScreen(businessId: businessId)),
-            ),
-            ListTile(
-              leading: const Icon(Icons.bar_chart_outlined),
-              title: const Text('Reports'),
-              onTap: () => onNavigate(const OwnerComingSoonScreen(title: 'Reports')),
-            ),
-            ListTile(
-              leading: const Icon(Icons.sell_outlined),
-              title: const Text('Price Management'),
-              onTap: () => onNavigate(const OwnerComingSoonScreen(title: 'Price Management')),
-            ),
-            ListTile(
-              leading: const Icon(Icons.person_outline),
-              title: const Text('Profile/Settings'),
-              onTap: () => onNavigate(const OwnerComingSoonScreen(title: 'Profile/Settings')),
-            ),
+            const SizedBox(height: AppSpacing.md),
+            loading
+                ? const SizedBox(
+                    height: 34,
+                    child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white)),
+                  )
+                : Text(
+                    '₹${formatIndianAmount(amount)}',
+                    style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w800),
+                  ),
           ],
         ),
       ),
     );
   }
 }
+
+class _StatGrid extends StatelessWidget {
+  const _StatGrid({
+    required this.summary,
+    required this.pendingOrders,
+    required this.onTapCustomers,
+    required this.onTapOrders,
+    required this.onTapPending,
+    required this.onTapPendingAmount,
+  });
+
+  final OwnerDashboardSummary summary;
+  final int pendingOrders;
+  final VoidCallback onTapCustomers;
+  final VoidCallback onTapOrders;
+  final VoidCallback onTapPending;
+  final VoidCallback onTapPendingAmount;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      _StatItem(
+        icon: Icons.groups_rounded,
+        value: summary.totalCustomers.toString(),
+        label: 'Customers',
+        bg: AppColors.statCustomersBg,
+        fg: AppColors.statCustomersFg,
+        onTap: onTapCustomers,
+      ),
+      _StatItem(
+        icon: Icons.inventory_2_rounded,
+        value: summary.todayOrders.toString(),
+        label: "Today's Orders",
+        bg: AppColors.statOrdersBg,
+        fg: AppColors.statOrdersFg,
+        onTap: onTapOrders,
+      ),
+      _StatItem(
+        icon: Icons.hourglass_bottom_rounded,
+        value: pendingOrders.toString(),
+        label: 'Pending Orders',
+        bg: AppColors.statPendingBg,
+        fg: AppColors.statPendingFg,
+        onTap: onTapPending,
+      ),
+      _StatItem(
+        icon: Icons.currency_rupee_rounded,
+        value: formatIndianAmount(summary.pendingAmount),
+        label: 'Pending Amount',
+        bg: AppColors.statAmountBg,
+        fg: AppColors.statAmountFg,
+        onTap: onTapPendingAmount,
+      ),
+    ];
+
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisSpacing: AppSpacing.md,
+      mainAxisSpacing: AppSpacing.md,
+      childAspectRatio: 1.35,
+      children: items.map((item) => _StatCard(item: item)).toList(),
+    );
+  }
+}
+
+class _StatItem {
+  const _StatItem({
+    required this.icon,
+    required this.value,
+    required this.label,
+    required this.bg,
+    required this.fg,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String value;
+  final String label;
+  final Color bg;
+  final Color fg;
+  final VoidCallback onTap;
+}
+
+class _StatCard extends StatelessWidget {
+  const _StatCard({required this.item});
+
+  final _StatItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      onTap: item.onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(color: item.bg, shape: BoxShape.circle),
+            child: Icon(item.icon, size: 18, color: item.fg),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(item.value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+          const SizedBox(height: 2),
+          Text(item.label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary), overflow: TextOverflow.ellipsis),
+        ],
+      ),
+    );
+  }
+}
+
+class _RecentOrderCard extends StatelessWidget {
+  const _RecentOrderCard({required this.order, required this.onTap});
+
+  final Map<String, dynamic> order;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final customer = (order['customer'] as Map<String, dynamic>?) ?? const <String, dynamic>{};
+    final customerName = (customer['name'] as String?)?.isNotEmpty == true ? customer['name'] as String : 'Customer';
+    final items = (order['order_items'] as List<dynamic>?) ?? const <dynamic>[];
+    final amount = (order['total_amount'] as num?) ?? 0;
+    final status = (order['status'] as String?) ?? 'pending';
+    final statusStyle = _statusStyle(status);
+
+    return AppCard(
+      onTap: onTap,
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(color: AppColors.ownerPrimary.withValues(alpha: 0.12), shape: BoxShape.circle),
+            child: const Icon(Icons.person_outline_rounded, color: AppColors.ownerPrimary, size: 20),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(customerName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: AppColors.textPrimary)),
+                const SizedBox(height: 2),
+                Text('${items.length} Items', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text('₹${formatIndianAmount(amount)}', style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(color: statusStyle.bg, borderRadius: BorderRadius.circular(AppRadius.pill)),
+                child: Text(
+                  statusStyle.label,
+                  style: TextStyle(color: statusStyle.fg, fontSize: 11, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  _StatusStyle _statusStyle(String status) {
+    switch (status) {
+      case 'pending':
+        return const _StatusStyle('Pending', AppColors.statPendingBg, AppColors.statPendingFg);
+      case 'ready':
+        return const _StatusStyle('Ready', AppColors.statOrdersBg, AppColors.statOrdersFg);
+      case 'completed':
+        return const _StatusStyle('Completed', Color(0xFFE1F7E8), Color(0xFF2E7D32));
+      case 'cancelled':
+        return const _StatusStyle('Cancelled', Color(0xFFFCE4E4), Color(0xFFC62828));
+      default:
+        return _StatusStyle(status, AppColors.divider, AppColors.textSecondary);
+    }
+  }
+}
+
+class _StatusStyle {
+  const _StatusStyle(this.label, this.bg, this.fg);
+  final String label;
+  final Color bg;
+  final Color fg;
+}
+

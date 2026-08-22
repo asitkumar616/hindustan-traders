@@ -1,12 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../services/app_state.dart';
 import '../services/admin_dashboard_service.dart';
+import '../services/app_state.dart';
 import '../services/auth_service.dart';
-import '../widgets/brand_logo.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_radius.dart';
+import '../theme/app_spacing.dart';
+import '../theme/app_text_styles.dart';
+import '../widgets/app_card.dart';
+import '../widgets/app_empty_state.dart';
+import '../widgets/app_error_state.dart';
+import '../widgets/app_flat_bottom_nav.dart';
+import '../widgets/app_loading_state.dart';
+import '../widgets/app_section_header.dart';
+import '../widgets/app_stat_card.dart';
+import '../widgets/app_voice_bottom_nav.dart' show AppNavItem;
 import 'admin_business_list_screen.dart';
 import 'admin_customer_list_screen.dart';
 import 'admin_owner_management_screen.dart';
+import 'admin_reports_screen.dart';
+import 'admin_settings_screen.dart';
 import 'login_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -17,27 +30,57 @@ class AdminDashboardScreen extends StatefulWidget {
 }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
-  late Future<_AdminDashboardData> _future;
+  bool _loading = true;
+  String? _loadError;
+  AdminDashboardSummary _summary = const AdminDashboardSummary(
+    totalOwners: 0,
+    totalBusinesses: 0,
+    totalCustomers: 0,
+    activeCustomers: 0,
+  );
+  List<AdminOwnerRecord> _pendingOwners = const <AdminOwnerRecord>[];
 
   @override
   void initState() {
     super.initState();
-    _future = _load();
+    _load();
   }
 
-  Future<_AdminDashboardData> _load() async {
-    final summary = await AdminDashboardService.fetchSummary();
-    return _AdminDashboardData(
-      summary: summary,
-      backendReady: AdminDashboardService.backendReady,
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
+    try {
+      final summary = await AdminDashboardService.fetchSummary();
+      final owners = await AdminDashboardService.listOwners();
+      if (!mounted) return;
+      setState(() {
+        _summary = summary;
+        _pendingOwners = owners.where((owner) => owner.approvalStatus.toLowerCase() == 'pending').take(5).toList();
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _loadError = error.toString());
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  Future<void> _logout() async {
+    await AuthService.signOut();
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
     );
   }
 
-  Future<void> _refresh() async {
-    setState(() {
-      _future = _load();
-    });
-    await _future;
+  void _push(Widget screen) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
   }
 
   @override
@@ -45,273 +88,194 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final appState = context.watch<AppState>();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Admin Insights'),
-        elevation: 0,
-        actions: [
-          IconButton(
-            onPressed: () async {
-              await AuthService.signOut();
-              if (!context.mounted) return;
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-                (route) => false,
-              );
-            },
-            icon: const Icon(Icons.logout),
-            tooltip: 'Logout',
-          ),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: _refresh,
-        child: FutureBuilder<_AdminDashboardData>(
-          future: _future,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-
-            if (snapshot.hasError) {
-              return ListView(
-                padding: const EdgeInsets.all(20),
-                children: [
-                  const SizedBox(height: 80),
-                  const Center(child: BrandLogo(size: 84, showLabel: false)),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Dashboard unavailable',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Unable to load dashboard: ${snapshot.error}',
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              );
-            }
-
-            final data = snapshot.data!;
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    gradient: LinearGradient(
-                      colors: [
-                        Theme.of(context).colorScheme.primary.withValues(alpha: 0.95),
-                        Theme.of(context).colorScheme.primary.withValues(alpha: 0.75),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                  child: const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      BrandLogo(size: 64, showLabel: false),
-                      SizedBox(height: 12),
-                      Text(
-                        'Business Overview',
-                        style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Track total owners and customer growth at a glance.',
-                        style: TextStyle(color: Colors.white70),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                if (!data.backendReady || !appState.backendReady)
-                  _BackendWarningCard(message: appState.backendStatus),
-                const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const AdminOwnerManagementScreen()),
-                      );
-                    },
-                    icon: const Icon(Icons.groups_2_outlined),
-                    label: const Text('Manage Owners'),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                _SummaryGrid(summary: data.summary),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _SummaryGrid extends StatelessWidget {
-  final AdminDashboardSummary summary;
-
-  const _SummaryGrid({required this.summary});
-
-  @override
-  Widget build(BuildContext context) {
-    final metrics = [
-      _MetricConfig(
-        label: 'Owners',
-        value: summary.totalOwners.toString(),
-        icon: Icons.manage_accounts,
-        color: Colors.green,
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminOwnerManagementScreen())),
-      ),
-      _MetricConfig(
-        label: 'Total customers',
-        value: summary.totalCustomers.toString(),
-        icon: Icons.groups_2,
-        color: Colors.indigo,
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminCustomerListScreen(onlyActive: false))),
-      ),
-      _MetricConfig(
-        label: 'Businesses',
-        value: summary.totalBusinesses.toString(),
-        icon: Icons.store_mall_directory,
-        color: Colors.teal,
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminBusinessListScreen())),
-      ),
-      _MetricConfig(
-        label: 'Active customers',
-        value: summary.activeCustomers.toString(),
-        icon: Icons.verified_user,
-        color: Colors.orange,
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminCustomerListScreen(onlyActive: true))),
-      ),
-    ];
-
-    return GridView.builder(
-      itemCount: metrics.length,
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: MediaQuery.of(context).size.width >= 700 ? 2 : 1,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 2.55,
-      ),
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemBuilder: (context, index) {
-        final metric = metrics[index];
-        return _MetricCard(
-          label: metric.label,
-          value: metric.value,
-          icon: metric.icon,
-          color: metric.color,
-          onTap: metric.onTap,
-        );
-      },
-    );
-  }
-}
-
-class _MetricConfig {
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _MetricConfig({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-    required this.onTap,
-  });
-}
-
-class _MetricCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _MetricCard({required this.label, required this.value, required this.icon, required this.color, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
+      backgroundColor: AppColors.surfaceMuted,
+      body: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: _load,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.sm, AppSpacing.xl, AppSpacing.xxl),
             children: [
-              CircleAvatar(backgroundColor: color.withValues(alpha: 0.12), child: Icon(icon, color: color)),
-              const SizedBox(width: 14),
-              Expanded(
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Admin Dashboard', style: AppTextStyles.heading),
+                  IconButton(onPressed: _logout, icon: const Icon(Icons.logout), color: AppColors.textPrimary),
+                ],
+              ),
+              if (!AdminDashboardService.backendReady || !appState.backendReady) ...[
+                const SizedBox(height: AppSpacing.md),
+                AppErrorState(message: appState.backendStatus),
+              ],
+              if (_loadError != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                AppErrorState(message: 'Something went wrong. Unable to load the dashboard.', onRetry: _load),
+              ],
+              const SizedBox(height: AppSpacing.xl),
+              _loading
+                  ? const AppLoadingState()
+                  : GridView.count(
+                      crossAxisCount: 2,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisSpacing: AppSpacing.md,
+                      mainAxisSpacing: AppSpacing.md,
+                      childAspectRatio: 1.35,
+                      children: [
+                        AppStatCard(
+                          icon: Icons.manage_accounts_rounded,
+                          value: _summary.totalOwners.toString(),
+                          label: 'Total Owners',
+                          bg: const Color(0xFFEFE9FF),
+                          fg: const Color(0xFF7C6EF2),
+                          onTap: () => _push(const AdminOwnerManagementScreen()),
+                        ),
+                        AppStatCard(
+                          icon: Icons.store_mall_directory_rounded,
+                          value: _summary.totalBusinesses.toString(),
+                          label: 'Total Businesses',
+                          bg: const Color(0xFFE1F7E8),
+                          fg: const Color(0xFF2E7D32),
+                          onTap: () => _push(const AdminBusinessListScreen()),
+                        ),
+                        AppStatCard(
+                          icon: Icons.groups_2_rounded,
+                          value: _summary.totalCustomers.toString(),
+                          label: 'Total Customers',
+                          bg: const Color(0xFFE1F0FF),
+                          fg: const Color(0xFF3B82F6),
+                          onTap: () => _push(const AdminCustomerListScreen(onlyActive: false)),
+                        ),
+                        AppStatCard(
+                          icon: Icons.verified_user_rounded,
+                          value: _summary.activeCustomers.toString(),
+                          label: 'Active Customers',
+                          bg: const Color(0xFFFFF1DC),
+                          fg: const Color(0xFFC9820A),
+                          onTap: () => _push(const AdminCustomerListScreen(onlyActive: true)),
+                        ),
+                      ],
+                    ),
+              const SizedBox(height: AppSpacing.xl),
+              AppSectionHeader(
+                title: 'Pending Approvals',
+                actionLabel: 'View All',
+                onAction: () => _push(const AdminOwnerManagementScreen()),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              if (_loading)
+                const SizedBox.shrink()
+              else if (_pendingOwners.isEmpty)
+                const AppEmptyState(
+                  icon: Icons.task_alt_rounded,
+                  title: 'All Caught Up',
+                  message: 'No owners are waiting for approval right now.',
+                )
+              else
+                ..._pendingOwners.map(
+                  (owner) => Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                    child: _PendingOwnerCard(owner: owner, onTap: () => _push(const AdminOwnerManagementScreen())),
+                  ),
+                ),
+              const SizedBox(height: AppSpacing.xl),
+              const AppSectionHeader(title: 'More Tools'),
+              const SizedBox(height: AppSpacing.md),
+              AppCard(
+                padding: EdgeInsets.zero,
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
-                    Text(label, style: const TextStyle(color: Colors.black54)),
+                    _ToolTile(
+                      icon: Icons.bar_chart_rounded,
+                      label: 'Reports',
+                      onTap: () => _push(const AdminReportsScreen()),
+                    ),
+                    const Divider(height: 1),
+                    _ToolTile(
+                      icon: Icons.settings_outlined,
+                      label: 'Settings',
+                      onTap: () => _push(const AdminSettingsScreen()),
+                    ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: Colors.black38),
             ],
           ),
         ),
       ),
+      bottomNavigationBar: AppFlatBottomNav(
+        accentColor: AppColors.adminPrimary,
+        items: [
+          const AppNavItem(icon: Icons.dashboard_rounded, label: 'Dashboard', active: true),
+          AppNavItem(icon: Icons.manage_accounts_outlined, label: 'Owners', onTap: () => _push(const AdminOwnerManagementScreen())),
+          AppNavItem(icon: Icons.store_mall_directory_outlined, label: 'Businesses', onTap: () => _push(const AdminBusinessListScreen())),
+          AppNavItem(icon: Icons.groups_2_outlined, label: 'Customers', onTap: () => _push(const AdminCustomerListScreen(onlyActive: false))),
+        ],
+      ),
     );
   }
 }
 
-class _AdminDashboardData {
-  final AdminDashboardSummary summary;
-  final bool backendReady;
 
-  const _AdminDashboardData({
-    required this.summary,
-    required this.backendReady,
-  });
-}
+class _PendingOwnerCard extends StatelessWidget {
+  const _PendingOwnerCard({required this.owner, required this.onTap});
 
-class _BackendWarningCard extends StatelessWidget {
-  final String message;
-
-  const _BackendWarningCard({required this.message});
+  final AdminOwnerRecord owner;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: Colors.orange.shade50,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: Colors.orange.shade200),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.orange.shade800),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                message,
-                style: TextStyle(color: Colors.orange.shade900, fontWeight: FontWeight.w600),
-              ),
+    return AppCard(
+      onTap: onTap,
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(color: AppColors.adminPrimary.withValues(alpha: 0.12), shape: BoxShape.circle),
+            child: const Icon(Icons.person_outline_rounded, color: AppColors.adminPrimary, size: 20),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(owner.ownerName, style: AppTextStyles.subheading),
+                const SizedBox(height: 2),
+                Text(owner.businessName, style: AppTextStyles.bodyMuted, overflow: TextOverflow.ellipsis),
+              ],
             ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(color: const Color(0xFFFFF1DC), borderRadius: BorderRadius.circular(AppRadius.pill)),
+            child: const Text('Pending', style: TextStyle(color: Color(0xFFC9820A), fontSize: 11, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ToolTile extends StatelessWidget {
+  const _ToolTile({required this.icon, required this.label, required this.onTap});
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.adminPrimary, size: 22),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(child: Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
+            const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
           ],
         ),
       ),
