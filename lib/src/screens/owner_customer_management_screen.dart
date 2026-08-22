@@ -4,10 +4,26 @@ import '../services/customer_business_service.dart';
 import '../services/owner_dashboard_service.dart';
 
 class OwnerCustomerManagementScreen extends StatefulWidget {
-  const OwnerCustomerManagementScreen({super.key, required this.businessId, this.onlyOutstanding = false});
+  const OwnerCustomerManagementScreen({
+    super.key,
+    required this.businessId,
+    this.onlyOutstanding = false,
+    this.autoOpenAdd = false,
+    this.initialName,
+    this.initialPhone,
+  });
 
   final String businessId;
   final bool onlyOutstanding;
+
+  /// Auto-opens the Add Customer dialog, pre-filled with [initialName] /
+  /// [initialPhone] -- used when the owner arrives here via the Ask
+  /// Assistant ("Add Raju Stores mobile 9876543210") so they land on the
+  /// normal form already filled in, still reviewing and confirming before
+  /// it saves.
+  final bool autoOpenAdd;
+  final String? initialName;
+  final String? initialPhone;
 
   @override
   State<OwnerCustomerManagementScreen> createState() => _OwnerCustomerManagementScreenState();
@@ -26,6 +42,13 @@ class _OwnerCustomerManagementScreenState extends State<OwnerCustomerManagementS
   void initState() {
     super.initState();
     _loadCustomers();
+    if (widget.autoOpenAdd) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _showAddCustomerDialog(prefillName: widget.initialName, prefillPhone: widget.initialPhone);
+        }
+      });
+    }
   }
 
   @override
@@ -91,10 +114,10 @@ class _OwnerCustomerManagementScreenState extends State<OwnerCustomerManagementS
     }
   }
 
-  Future<void> _showAddCustomerDialog() async {
-    _customerNameController.clear();
+  Future<void> _showAddCustomerDialog({String? prefillName, String? prefillPhone}) async {
+    _customerNameController.text = prefillName ?? '';
     _shopNameController.clear();
-    _phoneController.clear();
+    _phoneController.text = prefillPhone ?? '';
     _addressController.clear();
     _openingBalanceController.text = '0';
     bool isActive = true;

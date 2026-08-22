@@ -10,12 +10,15 @@ import '../src/services/owner_dashboard_service.dart';
 import '../src/theme/app_colors.dart';
 import '../src/theme/app_radius.dart';
 import '../src/theme/app_spacing.dart';
+import '../src/theme/app_text_styles.dart';
 import '../src/utils/formatters.dart';
 import '../src/widgets/app_card.dart';
 import '../src/widgets/app_empty_state.dart';
 import '../src/widgets/app_error_state.dart';
 import '../src/widgets/app_loading_state.dart';
+import '../src/widgets/app_quick_action_tile.dart';
 import '../src/widgets/app_voice_bottom_nav.dart';
+import '../src/widgets/ask_assistant_sheet.dart';
 import '../src/widgets/notifications_card.dart';
 import '../src/widgets/owner_nav_drawer.dart';
 import '../src/widgets/voice_order_card.dart';
@@ -189,6 +192,85 @@ class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
                 onTapPendingAmount: () => _push(OwnerCustomerManagementScreen(businessId: businessId, onlyOutstanding: true)),
               ),
               const SizedBox(height: AppSpacing.xl),
+              const Text('QUICK ACTIONS', style: AppTextStyles.sectionLabel),
+              const SizedBox(height: AppSpacing.md),
+              GridView.count(
+                crossAxisCount: 2,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisSpacing: AppSpacing.md,
+                mainAxisSpacing: AppSpacing.md,
+                childAspectRatio: 1.5,
+                children: [
+                  AppQuickActionTile(
+                    icon: Icons.shopping_cart_outlined,
+                    label: 'Order',
+                    accentColor: AppColors.ownerPrimary,
+                    onTap: hasBusiness ? () => _showOrderChooser(businessId) : () {},
+                  ),
+                  AppQuickActionTile(
+                    icon: Icons.person_outline_rounded,
+                    label: 'Customer',
+                    accentColor: AppColors.ownerPrimary,
+                    onTap: () => _push(OwnerCustomerManagementScreen(businessId: businessId)),
+                  ),
+                  AppQuickActionTile(
+                    icon: Icons.inventory_2_outlined,
+                    label: 'Product',
+                    accentColor: AppColors.ownerPrimary,
+                    onTap: hasBusiness ? () => _push(OwnerProductManagementScreen(businessId: businessId)) : () {},
+                  ),
+                  AppQuickActionTile(
+                    icon: Icons.currency_rupee_rounded,
+                    label: 'Payment',
+                    accentColor: AppColors.ownerPrimary,
+                    onTap: () => _push(OwnerCustomerManagementScreen(businessId: businessId, onlyOutstanding: true)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              InkWell(
+                onTap: () => _showAssistant(businessId),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [AppColors.ownerPrimaryDark, AppColors.ownerPrimaryLight],
+                    ),
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                    boxShadow: [
+                      BoxShadow(color: AppColors.ownerPrimary.withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 8)),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), shape: BoxShape.circle),
+                        child: const Icon(Icons.mic_rounded, color: Colors.white, size: 24),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Ask Assistant', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
+                            SizedBox(height: 2),
+                            Text('Speak or type to get things done', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right_rounded, color: Colors.white70),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xl),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -257,6 +339,69 @@ class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: SafeArea(top: false, child: VoiceOrderCard(businessId: businessId.isEmpty ? null : businessId)),
       ),
+    );
+  }
+
+  // "Order" quick action: normal UI is the primary path here (Browse
+  // Products), with Speak offered as one option rather than the whole
+  // experience. There's no owner-side order-builder screen yet, so both
+  // options route to the closest existing functionality for now.
+  void _showOrderChooser(String businessId) {
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Create Order', style: AppTextStyles.heading),
+              const SizedBox(height: AppSpacing.xs),
+              const Text('How would you like to add items?', style: AppTextStyles.bodyMuted),
+              const SizedBox(height: AppSpacing.lg),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(color: AppColors.ownerPrimary.withValues(alpha: 0.12), shape: BoxShape.circle),
+                  child: const Icon(Icons.mic_rounded, color: AppColors.ownerPrimary),
+                ),
+                title: const Text('Speak', style: TextStyle(fontWeight: FontWeight.w700)),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _showVoiceOrderSheet(businessId);
+                },
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(color: AppColors.ownerPrimary.withValues(alpha: 0.12), shape: BoxShape.circle),
+                  child: const Icon(Icons.inventory_2_outlined, color: AppColors.ownerPrimary),
+                ),
+                title: const Text('Browse Products', style: TextStyle(fontWeight: FontWeight.w700)),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _push(OwnerProductManagementScreen(businessId: businessId));
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showAssistant(String businessId) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
+      builder: (_) => AskAssistantSheet(businessId: businessId),
     );
   }
 }

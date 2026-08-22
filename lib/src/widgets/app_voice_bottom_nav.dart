@@ -32,8 +32,13 @@ class AppVoiceBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Android phones with on-screen nav buttons or a gesture bar paint their
+    // own system UI in this exact strip. Without this inset, that system UI
+    // sits on top of our nav icons and swallows every tap aimed at them.
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+
     return SizedBox(
-      height: 76,
+      height: 76 + bottomInset,
       child: Stack(
         clipBehavior: Clip.none,
         alignment: Alignment.topCenter,
@@ -43,7 +48,8 @@ class AppVoiceBottomNav extends StatelessWidget {
             right: 0,
             bottom: 0,
             child: Container(
-              height: 64,
+              height: 64 + bottomInset,
+              padding: EdgeInsets.only(bottom: bottomInset),
               decoration: BoxDecoration(
                 color: Colors.white,
                 boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, -2))],

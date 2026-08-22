@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../src/screens/login_screen.dart';
 import '../src/services/auth_service.dart';
 import '../src/services/customer_dashboard_service.dart';
 import '../src/services/order_service.dart';
+import '../src/services/receipt_pdf_service.dart';
 import '../src/theme/app_colors.dart';
 import '../src/theme/app_radius.dart';
 import '../src/theme/app_spacing.dart';
@@ -13,8 +13,10 @@ import '../src/widgets/app_empty_state.dart';
 import '../src/widgets/app_error_state.dart';
 import '../src/widgets/app_filter_chip.dart';
 import '../src/widgets/app_loading_state.dart';
+import '../src/widgets/app_primary_button.dart';
 import '../src/widgets/app_voice_bottom_nav.dart';
 import '../src/widgets/voice_order_card.dart';
+import 'customer_profile_screen.dart';
 
 class CustomerOrdersScreen extends StatefulWidget {
   const CustomerOrdersScreen({super.key});
@@ -60,13 +62,23 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
     }
   }
 
-  Future<void> _logout() async {
-    await AuthService.signOut();
-    if (!mounted) return;
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-      (route) => false,
+  void _openProfile() {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerProfileScreen()));
+  }
+
+  void _showOrderDetail(Map<String, dynamic> order) {
+    final businessId = order['business_id']?.toString() ?? '';
+    final matches = _businesses.where((business) => business.businessId == businessId);
+    final businessName = matches.isNotEmpty ? matches.first.businessName : 'Shop';
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: SafeArea(top: false, child: _OrderDetailSheet(order: order, businessName: businessName)),
+      ),
     );
   }
 
@@ -173,7 +185,11 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
                             ...filteredOrders.map(
                               (order) => Padding(
                                 padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                                child: _OrderCard(order: order, businesses: _businesses),
+                                child: _OrderCard(
+                                  order: order,
+                                  businesses: _businesses,
+                                  onTap: () => _showOrderDetail(order),
+                                ),
                               ),
                             ),
                         ],
@@ -192,7 +208,7 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
         ],
         rightItems: [
           const AppNavItem(icon: Icons.receipt_long_outlined, label: 'Orders', active: true),
-          AppNavItem(icon: Icons.person_outline_rounded, label: 'Profile', onTap: _logout),
+          AppNavItem(icon: Icons.person_outline_rounded, label: 'Profile', onTap: _openProfile),
         ],
         onVoice: _showVoiceOrder,
       ),
@@ -202,10 +218,11 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
 
 
 class _OrderCard extends StatelessWidget {
-  const _OrderCard({required this.order, required this.businesses});
+  const _OrderCard({required this.order, required this.businesses, required this.onTap});
 
   final Map<String, dynamic> order;
   final List<CustomerBusiness> businesses;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -221,6 +238,7 @@ class _OrderCard extends StatelessWidget {
     final statusStyle = _statusStyleFor(status);
 
     return AppCard(
+      onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -277,4 +295,130 @@ class _StatusStyle {
   final String label;
   final Color bg;
   final Color fg;
+}
+
+class _OrderDetailSheet extends StatefulWidget {
+  const _OrderDetailSheet({required this.order, required this.businessName});
+
+  final Map<String, dynamic> order;
+  final String businessName;
+
+  @override
+  State<_OrderDetailSheet> createState() => _OrderDetailSheetState();
+}
+
+class _OrderDetailSheetState extends State<_OrderDetailSheet> {
+  List<Map<String, dynamic>> _items = const <Map<String, dynamic>>[];
+  bool _loading = true;
+  bool _printing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final orderId = widget.order['id']?.toString() ?? '';
+    final items = orderId.isEmpty ? const <Map<String, dynamic>>[] : await OrderService.getOrderItems(orderId);
+    if (!mounted) return;
+    setState(() {
+      _items = items;
+      _loading = false;
+    });
+  }
+
+  Future<void> _printReceipt() async {
+    setState(() => _printing = true);
+    try {
+      final profile = await AuthService.getCurrentProfile();
+      final createdAt = DateTime.tryParse(widget.order['created_at']?.toString() ?? '') ?? DateTime.now();
+      final orderNumber = (widget.order['id']?.toString() ?? '').replaceAll('-', '');
+      final shortNumber = orderNumber.length >= 6 ? orderNumber.substring(0, 6).toUpperCase() : orderNumber.toUpperCase();
+
+      final bytes = await ReceiptPdfService.buildReceipt(
+        businessName: widget.businessName,
+        customerName: profile?.name?.isNotEmpty == true ? profile!.name! : 'Customer',
+        documentNumber: 'Order #$shortNumber',
+        date: createdAt,
+        items: _items.map((item) {
+          final product = (item['product'] as Map<String, dynamic>?) ?? <String, dynamic>{};
+          return ReceiptLine(
+            name: product['name']?.toString() ?? 'Item',
+            quantity: (item['quantity'] as num?) ?? 0,
+            unit: item['unit']?.toString() ?? '',
+            price: (item['price'] as num?) ?? 0,
+            amount: (item['amount'] as num?) ?? 0,
+          );
+        }).toList(),
+        total: (widget.order['total_amount'] as num?) ?? 0,
+      );
+
+      await ReceiptPdfService.printOrShare(bytes, fileName: 'order_$shortNumber');
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Unable to generate receipt: $error')));
+    } finally {
+      if (mounted) {
+        setState(() => _printing = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final orderNumber = (widget.order['id']?.toString() ?? '').replaceAll('-', '');
+    final shortNumber = orderNumber.length >= 6 ? orderNumber.substring(0, 6).toUpperCase() : orderNumber.toUpperCase();
+    final amount = (widget.order['total_amount'] as num?) ?? 0;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Order #$shortNumber', style: AppTextStyles.heading),
+        const SizedBox(height: 2),
+        Text(widget.businessName, style: AppTextStyles.bodyMuted),
+        const SizedBox(height: AppSpacing.lg),
+        if (_loading)
+          const AppLoadingState()
+        else if (_items.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+            child: Text('No item breakdown available for this order.', style: AppTextStyles.bodyMuted),
+          )
+        else
+          ..._items.map((item) {
+            final product = (item['product'] as Map<String, dynamic>?) ?? <String, dynamic>{};
+            final name = product['name']?.toString() ?? 'Item';
+            final qty = item['quantity'];
+            final unit = item['unit']?.toString() ?? '';
+            final itemAmount = (item['amount'] as num?) ?? 0;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: Row(
+                children: [
+                  Expanded(child: Text('$name · $qty $unit', style: AppTextStyles.body)),
+                  Text('₹${formatIndianAmount(itemAmount)}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                ],
+              ),
+            );
+          }),
+        const Divider(height: AppSpacing.xl),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Total', style: AppTextStyles.subheading),
+            Text('₹${formatIndianAmount(amount)}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        AppPrimaryButton(
+          label: _printing ? 'Preparing...' : 'Print / Save Receipt',
+          icon: Icons.print_outlined,
+          onPressed: (_loading || _printing) ? null : _printReceipt,
+          loading: _printing,
+        ),
+      ],
+    );
+  }
 }

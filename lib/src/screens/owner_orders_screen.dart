@@ -85,6 +85,28 @@ class _OwnerOrdersScreenState extends State<OwnerOrdersScreen> {
     }
   }
 
+  Future<void> _confirmReject(Map<String, dynamic> order) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Reject this order?'),
+        content: const Text('The customer will be notified that their order was declined. This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Reject Order'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _updateStatus(order, 'cancelled');
+    }
+  }
+
   void _showOrderDetails(Map<String, dynamic> order) {
     final customer = (order['customer'] as Map<String, dynamic>?) ?? <String, dynamic>{};
     final customerName = (customer['name'] as String?) ?? 'Customer';
@@ -96,66 +118,92 @@ class _OwnerOrdersScreenState extends State<OwnerOrdersScreen> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
       builder: (sheetContext) {
         return Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Order #${order['id']?.toString().substring(0, 8) ?? 'n/a'}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 12),
-              Text('Customer: $customerName${customerPhone.isEmpty ? '' : ' • $customerPhone'}'),
-              const SizedBox(height: 6),
-              Text('Placed: $createdAt'),
-              const SizedBox(height: 8),
-              Text('Status: ${status.toUpperCase()}'),
-              const SizedBox(height: 12),
-              const Text('Items:'),
-              const SizedBox(height: 4),
-              if (items.isEmpty)
-                const Text('No item breakdown available yet.')
-              else
-                ...items.map((item) {
-                  final itemMap = item as Map<String, dynamic>;
-                  final product = (itemMap['product'] as Map<String, dynamic>?) ?? <String, dynamic>{};
-                  final productName = (product['name'] as String?) ?? 'Product';
-                  final qty = itemMap['quantity'] ?? 0;
-                  final amount = itemMap['amount'] ?? 0;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Text('• $productName × $qty • ₹$amount'),
-                  );
-                }),
-              const SizedBox(height: 12),
-              Text('Total: ₹${(order['total_amount'] as num? ?? 0).toStringAsFixed(0)}'),
-              const SizedBox(height: 16),
-              if (status == 'pending')
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Order #${order['id']?.toString().substring(0, 8) ?? 'n/a'}', style: AppTextStyles.heading),
+                const SizedBox(height: AppSpacing.md),
+                Text('Customer: $customerName${customerPhone.isEmpty ? '' : ' • $customerPhone'}', style: AppTextStyles.body),
+                const SizedBox(height: 4),
+                Text('Placed: $createdAt', style: AppTextStyles.bodyMuted),
+                const SizedBox(height: AppSpacing.md),
+                const Text('Items', style: AppTextStyles.sectionLabel),
+                const SizedBox(height: AppSpacing.sm),
+                if (items.isEmpty)
+                  const Text('No item breakdown available yet.', style: AppTextStyles.bodyMuted)
+                else
+                  ...items.map((item) {
+                    final itemMap = item as Map<String, dynamic>;
+                    final product = (itemMap['product'] as Map<String, dynamic>?) ?? <String, dynamic>{};
+                    final productName = (product['name'] as String?) ?? 'Product';
+                    final qty = itemMap['quantity'] ?? 0;
+                    final amount = (itemMap['amount'] as num?) ?? 0;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Row(
+                        children: [
+                          Expanded(child: Text('$productName × $qty', style: AppTextStyles.body)),
+                          Text('₹${formatIndianAmount(amount)}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+                    );
+                  }),
+                const Divider(height: AppSpacing.xl),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Total', style: AppTextStyles.subheading),
+                    Text(
+                      '₹${formatIndianAmount((order['total_amount'] as num?) ?? 0)}',
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                if (status == 'pending')
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(foregroundColor: AppColors.danger, side: const BorderSide(color: AppColors.danger)),
+                          onPressed: () => _confirmReject(order),
+                          child: const Text('Reject'),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => _updateStatus(order, 'ready'),
+                          child: const Text('Approve'),
+                        ),
+                      ),
+                    ],
+                  )
+                else if (status == 'ready')
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => _updateStatus(order, 'completed'),
+                      child: const Text('Mark Packed / Completed'),
+                    ),
+                  ),
+                const SizedBox(height: AppSpacing.sm),
                 SizedBox(
                   width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => _updateStatus(order, 'ready'),
-                    child: const Text('Approve • Mark ready'),
-                  ),
-                )
-              else if (status == 'ready')
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => _updateStatus(order, 'completed'),
-                    child: const Text('Close order • Mark complete'),
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(sheetContext),
+                    child: const Text('Close'),
                   ),
                 ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () => Navigator.pop(sheetContext),
-                  child: const Text('Close'),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },

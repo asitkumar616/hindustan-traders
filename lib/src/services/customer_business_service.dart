@@ -205,6 +205,7 @@ class CustomerBusinessService {
 
   static Future<void> updateProduct({
     required String productId,
+    required String businessId,
     String? name,
     String? unit,
     double? price,
@@ -226,6 +227,58 @@ class CustomerBusinessService {
 
     if (price != null) {
       await client.from('product_prices').insert(buildPricePayload(productId: productId, price: price));
+      await _notifyCustomersOfPriceChange(
+        businessId: businessId,
+        productName: name?.trim().isNotEmpty == true ? name!.trim() : 'A product',
+        newPrice: price,
+        unit: unit,
+      );
+    }
+  }
+
+  // Broadcasts a price change to every registered customer of this
+  // business. Non-fatal by design: the price itself is already saved by
+  // the time this runs, so a failure here (e.g. no registered customers,
+  // or an RLS restriction) must not surface as a failed product update.
+  static Future<void> _notifyCustomersOfPriceChange({
+    required String businessId,
+    required String productName,
+    required double newPrice,
+    String? unit,
+  }) async {
+    try {
+      final client = _clientOrNull;
+      if (client == null) return;
+
+      final rows = await client
+          .from('customers')
+          .select('profile_id')
+          .eq('business_id', businessId)
+          .not('profile_id', 'is', null);
+
+      final recipientIds = (rows as List)
+          .map((row) => (row as Map)['profile_id']?.toString())
+          .whereType<String>()
+          .toSet()
+          .toList();
+
+      if (recipientIds.isEmpty) return;
+
+      final unitLabel = unit?.trim().isNotEmpty == true ? '/${unit!.trim()}' : '';
+
+      await client.from('notifications').insert(
+        recipientIds
+            .map((recipientId) => {
+                  'recipient_id': recipientId,
+                  'business_id': businessId,
+                  'title': 'Price updated',
+                  'body': '$productName is now ₹${newPrice.toStringAsFixed(0)}$unitLabel.',
+                  'data': {'product_name': productName, 'new_price': newPrice},
+                })
+            .toList(),
+      );
+    } catch (_) {
+      // Non-fatal -- see comment above.
     }
   }
 

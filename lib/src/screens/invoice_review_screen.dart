@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/receipt_pdf_service.dart';
 
 class InvoiceReviewScreen extends StatefulWidget {
   const InvoiceReviewScreen({super.key, required this.invoiceId});
@@ -14,13 +17,32 @@ class InvoiceReviewScreen extends StatefulWidget {
 class _InvoiceReviewScreenState extends State<InvoiceReviewScreen> {
   Map<String, dynamic>? _invoice;
   List<Map<String, dynamic>> _lineItems = [];
+  String _businessName = 'Hindustan Traders';
   bool _loading = true;
   bool _recordingPayment = false;
+  bool _printing = false;
 
   @override
   void initState() {
     super.initState();
     _loadInvoice();
+  }
+
+  // Kept separate from the main invoice select on purpose: if this lookup
+  // fails for any reason (permissions, missing row, etc.) it should just
+  // fall back to the placeholder name above rather than break invoice
+  // loading, which the business name isn't essential for.
+  Future<void> _loadBusinessName(String? businessId) async {
+    if (businessId == null || businessId.isEmpty) return;
+    try {
+      final row = await Supabase.instance.client.from('businesses').select('name').eq('id', businessId).maybeSingle();
+      final name = row?['name']?.toString();
+      if (mounted && name != null && name.isNotEmpty) {
+        setState(() => _businessName = name);
+      }
+    } catch (_) {
+      // Keep the placeholder name.
+    }
   }
 
   Future<void> _loadInvoice() async {
@@ -43,6 +65,8 @@ class _InvoiceReviewScreenState extends State<InvoiceReviewScreen> {
       if (orderId != null && orderId.isNotEmpty) {
         await _loadLineItems(orderId);
       }
+
+      unawaited(_loadBusinessName(response?['business_id']?.toString()));
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -230,6 +254,46 @@ class _InvoiceReviewScreenState extends State<InvoiceReviewScreen> {
     );
   }
 
+  Future<void> _printReceipt() async {
+    final invoice = _invoice;
+    if (invoice == null) return;
+
+    setState(() => _printing = true);
+    try {
+      final customer = (invoice['customer'] as Map<String, dynamic>?) ?? <String, dynamic>{};
+      final createdAt = DateTime.tryParse(invoice['created_at']?.toString() ?? '') ?? DateTime.now();
+
+      final bytes = await ReceiptPdfService.buildReceipt(
+        businessName: _businessName,
+        customerName: customer['display_name']?.toString() ?? 'Customer',
+        documentNumber: invoice['invoice_number']?.toString() ?? 'Invoice',
+        date: createdAt,
+        items: _lineItems.map((item) {
+          final product = (item['product'] as Map<String, dynamic>?) ?? <String, dynamic>{};
+          return ReceiptLine(
+            name: product['name']?.toString() ?? 'Item',
+            quantity: (item['quantity'] as num?) ?? 0,
+            unit: item['unit']?.toString() ?? '',
+            price: (item['price'] as num?) ?? 0,
+            amount: (item['amount'] as num?) ?? 0,
+          );
+        }).toList(),
+        total: (invoice['total'] as num?) ?? 0,
+        paid: (invoice['paid_amount'] as num?) ?? 0,
+        balance: (invoice['balance_amount'] as num?) ?? 0,
+      );
+
+      await ReceiptPdfService.printOrShare(bytes, fileName: invoice['invoice_number']?.toString() ?? 'receipt');
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Unable to generate receipt: $error')));
+    } finally {
+      if (mounted) {
+        setState(() => _printing = false);
+      }
+    }
+  }
+
   void _shareInvoice() {
     final invoice = _invoice;
     if (invoice == null) return;
@@ -344,6 +408,17 @@ class _InvoiceReviewScreenState extends State<InvoiceReviewScreen> {
                         onPressed: _shareInvoice,
                         icon: const Icon(Icons.share_outlined),
                         label: const Text('Share Invoice'),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _printing ? null : _printReceipt,
+                        icon: _printing
+                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.print_outlined),
+                        label: Text(_printing ? 'Preparing...' : 'Print / Save PDF'),
                       ),
                     ),
                   ],

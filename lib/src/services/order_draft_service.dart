@@ -165,23 +165,23 @@ class OrderDraftService {
           }).toList(),
         );
 
-        final invoiceDraft = await CustomerBusinessService.createInvoiceDraft(
+        await _notifyOwnerOfNewOrder(
+          businessId: resolvedBusinessId,
+          orderId: orderId,
+          totalAmount: mappedProducts.fold<double>(0, (sum, current) => sum + (current['amount'] as num).toDouble()),
+        );
+
+        // Invoice-draft creation is a follow-on convenience, not part of
+        // placing the order itself -- by the time this runs, the order and
+        // its items are already committed. If this fails (e.g. RLS not
+        // permitting a customer to write to `invoices`), the customer must
+        // still see their order as placed, not a false failure.
+        await _createInvoiceDraftForOrder(
           businessId: resolvedBusinessId,
           customerId: user.id,
           orderId: orderId,
           totalAmount: mappedProducts.fold<double>(0, (sum, current) => sum + (current['amount'] as num).toDouble()),
         );
-        if (invoiceDraft != null) {
-          await SupabaseService.client.from('notifications').insert({
-            'recipient_id': user.id,
-            'business_id': resolvedBusinessId,
-            'title': 'Invoice draft created',
-            'body': 'Invoice ${invoiceDraft['invoice_number']} is ready for review.',
-            'data': {'invoice_id': invoiceDraft['id']},
-          });
-
-          await SupabaseService.client.from('orders').update({'invoice_id': invoiceDraft['id']}).eq('id', orderId);
-        }
       }
 
       await _persistDraftLocally(draft);
@@ -248,26 +248,89 @@ class OrderDraftService {
         }).toList(),
       );
 
-      final invoiceDraft = await CustomerBusinessService.createInvoiceDraft(
+      await _notifyOwnerOfNewOrder(businessId: businessId, orderId: orderId, totalAmount: totalAmount);
+
+      // Non-fatal, same reasoning as submitDraft above: the order is
+      // already placed by this point, so a failure here must not be
+      // reported back to the customer as a failed order.
+      await _createInvoiceDraftForOrder(
         businessId: businessId,
         customerId: user.id,
         orderId: orderId,
         totalAmount: totalAmount,
       );
-      if (invoiceDraft != null) {
-        await SupabaseService.client.from('notifications').insert({
-          'recipient_id': user.id,
-          'business_id': businessId,
-          'title': 'Invoice draft created',
-          'body': 'Invoice ${invoiceDraft['invoice_number']} is ready for review.',
-          'data': {'invoice_id': invoiceDraft['id']},
-        });
-        await SupabaseService.client.from('orders').update({'invoice_id': invoiceDraft['id']}).eq('id', orderId);
-      }
 
       return const OrderSubmissionResult(success: true, message: 'Order placed successfully.');
     } catch (_) {
       return const OrderSubmissionResult(success: false, message: 'Unable to place your order. Please try again.');
+    }
+  }
+
+  // Creates the invoice draft for a just-placed order, and swallows its own
+  // errors for the same reason _notifyOwnerOfNewOrder does: by the time this
+  // runs, the order + order_items are already committed in separate prior
+  // calls, so a failure here (e.g. RLS not permitting a customer to write to
+  // `invoices`) does not mean the order failed, and must not be reported as
+  // one. If it does fail, the owner can still create/attach an invoice
+  // manually from their side later.
+  static Future<void> _createInvoiceDraftForOrder({
+    required String businessId,
+    required String customerId,
+    required String orderId,
+    required double totalAmount,
+  }) async {
+    try {
+      final invoiceDraft = await CustomerBusinessService.createInvoiceDraft(
+        businessId: businessId,
+        customerId: customerId,
+        orderId: orderId,
+        totalAmount: totalAmount,
+      );
+      if (invoiceDraft == null) return;
+
+      await SupabaseService.client.from('notifications').insert({
+        'recipient_id': customerId,
+        'business_id': businessId,
+        'title': 'Invoice draft created',
+        'body': 'Invoice ${invoiceDraft['invoice_number']} is ready for review.',
+        'data': {'invoice_id': invoiceDraft['id']},
+      });
+
+      await SupabaseService.client.from('orders').update({'invoice_id': invoiceDraft['id']}).eq('id', orderId);
+    } catch (_) {
+      // Non-fatal -- see comment above.
+    }
+  }
+
+  // Alerts the business owner that a new order came in. Looked up fresh each
+  // time (rather than trusting a client-supplied id) so it can't be spoofed,
+  // and deliberately swallows its own errors -- the order itself has already
+  // been written successfully by the time this runs, so a failure here
+  // (e.g. RLS not yet permitting a customer to read `businesses.owner_id`)
+  // must not be reported back as a failed order.
+  static Future<void> _notifyOwnerOfNewOrder({
+    required String businessId,
+    required String orderId,
+    required double totalAmount,
+  }) async {
+    try {
+      final business = await SupabaseService.client
+          .from('businesses')
+          .select('owner_id')
+          .eq('id', businessId)
+          .maybeSingle();
+      final ownerId = business?['owner_id'] as String?;
+      if (ownerId == null) return;
+
+      await SupabaseService.client.from('notifications').insert({
+        'recipient_id': ownerId,
+        'business_id': businessId,
+        'title': 'New order received',
+        'body': 'A customer placed a new order worth ₹${totalAmount.toStringAsFixed(0)}.',
+        'data': {'order_id': orderId},
+      });
+    } catch (_) {
+      // Non-fatal -- see comment above.
     }
   }
 

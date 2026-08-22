@@ -19,6 +19,7 @@ import '../src/widgets/notifications_card.dart';
 import '../src/widgets/voice_order_card.dart';
 import 'cart_screen.dart';
 import 'customer_orders_screen.dart';
+import 'customer_profile_screen.dart';
 import 'product_detail_screen.dart';
 
 class CustomerHomeScreen extends StatefulWidget {
@@ -113,6 +114,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
 
   void _openOrders() {
     Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerOrdersScreen()));
+  }
+
+  void _openProfile() {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerProfileScreen()));
   }
 
   void _showNotifications() {
@@ -257,7 +262,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         ],
         rightItems: [
           AppNavItem(icon: Icons.receipt_long_outlined, label: 'Orders', onTap: _openOrders),
-          AppNavItem(icon: Icons.person_outline_rounded, label: 'Profile', onTap: _logout),
+          AppNavItem(icon: Icons.person_outline_rounded, label: 'Profile', onTap: _openProfile),
         ],
         onVoice: _showVoiceOrder,
       ),

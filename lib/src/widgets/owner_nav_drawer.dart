@@ -4,6 +4,7 @@ import '../screens/owner_customer_management_screen.dart';
 import '../screens/owner_invoices_screen.dart';
 import '../screens/owner_orders_screen.dart';
 import '../screens/owner_product_management_screen.dart';
+import '../screens/owner_reports_screen.dart';
 import '../screens/owner_transactions_screen.dart';
 
 /// Shared "More" drawer for every Owner-app screen (Dashboard, Products,
@@ -64,7 +65,7 @@ class OwnerNavDrawer extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.bar_chart_outlined),
               title: const Text('Reports'),
-              onTap: () => onNavigate(const OwnerComingSoonScreen(title: 'Reports')),
+              onTap: () => onNavigate(OwnerReportsScreen(businessId: businessId)),
             ),
             ListTile(
               leading: const Icon(Icons.sell_outlined),

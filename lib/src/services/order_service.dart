@@ -54,6 +54,22 @@ class OrderService {
     return List<Map<String, dynamic>>.from(response as List);
   }
 
+  /// Line items for a single order, with product names -- used to build a
+  /// printable receipt from the customer side. Relies on the
+  /// `order_items_select_related` RLS policy (allowed when the caller is
+  /// either the order's own customer or a member of its business).
+  static Future<List<Map<String, dynamic>>> getOrderItems(String orderId) async {
+    final client = _clientOrNull;
+    if (client == null) return [];
+
+    final response = await client
+        .from('order_items')
+        .select('id, product_id, quantity, unit, price, amount, product:products!order_items_product_id_fkey(name)')
+        .eq('order_id', orderId);
+
+    return List<Map<String, dynamic>>.from(response as List);
+  }
+
   static Future<List<Map<String, dynamic>>> getOrdersForBusiness(String businessId) async {
     final client = _clientOrNull;
     if (client == null) return [];
@@ -92,15 +108,23 @@ class OrderService {
   }) async {
     await _client.from('orders').update({'status': status}).eq('id', orderId);
 
-    if (status == 'ready' && customerId != null && businessId != null) {
-      await _client.from('notifications').insert({
-        'recipient_id': customerId,
-        'business_id': businessId,
-        'title': 'Order packed',
-        'body': 'Your order is packed and ready for delivery.',
-        'data': {'order_id': orderId, 'status': status},
-      });
-    }
+    if (customerId == null || businessId == null) return;
+
+    final notification = switch (status) {
+      'ready' => ('Order packed', 'Your order is packed and ready for delivery.'),
+      'completed' => ('Order completed', 'Your order has been marked complete.'),
+      'cancelled' => ('Order declined', 'Your order was declined by the shop. Please contact them for details.'),
+      _ => null,
+    };
+    if (notification == null) return;
+
+    await _client.from('notifications').insert({
+      'recipient_id': customerId,
+      'business_id': businessId,
+      'title': notification.$1,
+      'body': notification.$2,
+      'data': {'order_id': orderId, 'status': status},
+    });
   }
 
   static String formatDisplayDate(String? timestamp) {

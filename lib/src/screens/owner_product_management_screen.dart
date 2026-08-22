@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import '../models/voice_product_draft.dart';
 import '../services/auth_service.dart';
 import '../services/customer_business_service.dart';
 import '../services/voice_product_parser.dart';
@@ -21,10 +22,21 @@ import 'login_screen.dart';
 import 'owner_orders_screen.dart';
 
 class OwnerProductManagementScreen extends StatefulWidget {
-  const OwnerProductManagementScreen({super.key, required this.businessId, this.autoOpenAdd = false});
+  const OwnerProductManagementScreen({
+    super.key,
+    required this.businessId,
+    this.autoOpenAdd = false,
+    this.initialDraft,
+  });
 
   final String businessId;
   final bool autoOpenAdd;
+
+  /// Pre-fills the auto-opened Add Product dialog -- used when the owner
+  /// arrives here via the Ask Assistant ("Add Kohinoor rice 25 kg bag at 60
+  /// rupees per kg") so they land on the normal form already filled in,
+  /// still reviewing and confirming before it saves.
+  final VoiceProductDraft? initialDraft;
 
   @override
   State<OwnerProductManagementScreen> createState() => _OwnerProductManagementScreenState();
@@ -45,7 +57,7 @@ class _OwnerProductManagementScreenState extends State<OwnerProductManagementScr
     _loadProducts();
     if (widget.autoOpenAdd) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _showProductDialog();
+        if (mounted) _showProductDialog(prefillDraft: widget.initialDraft);
       });
     }
   }
@@ -85,14 +97,16 @@ class _OwnerProductManagementScreenState extends State<OwnerProductManagementScr
     }
   }
 
-  Future<void> _showProductDialog({Map<String, dynamic>? product}) async {
+  Future<void> _showProductDialog({Map<String, dynamic>? product, VoiceProductDraft? prefillDraft}) async {
     final user = AuthService.currentUser;
     if (user == null) return;
 
-    final nameController = TextEditingController(text: product?['name']?.toString() ?? '');
-    final unitController = TextEditingController(text: product?['unit']?.toString() ?? 'kg');
+    final nameController = TextEditingController(text: product?['name']?.toString() ?? prefillDraft?.name ?? '');
+    final unitController = TextEditingController(text: product?['unit']?.toString() ?? prefillDraft?.unit ?? 'kg');
     final priceController = TextEditingController(
-      text: product == null ? '0' : (product['price'] as num? ?? 0).toString(),
+      text: product != null
+          ? (product['price'] as num? ?? 0).toString()
+          : (prefillDraft?.price?.toStringAsFixed(0) ?? '0'),
     );
     final isEditing = product != null;
     bool submitting = false;
@@ -220,6 +234,7 @@ class _OwnerProductManagementScreenState extends State<OwnerProductManagementScr
                             if (isEditing) {
                               await CustomerBusinessService.updateProduct(
                                 productId: product['id']?.toString() ?? '',
+                                businessId: widget.businessId,
                                 name: nameController.text.trim(),
                                 unit: unit,
                                 price: price,

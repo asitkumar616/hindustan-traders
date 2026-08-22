@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../src/screens/login_screen.dart';
 import '../src/services/auth_service.dart';
 import '../src/services/customer_dashboard_service.dart';
 import '../src/services/notification_service.dart';
@@ -19,6 +18,7 @@ import '../src/widgets/app_voice_bottom_nav.dart';
 import '../src/widgets/voice_order_card.dart';
 import 'customer_home_screen.dart';
 import 'customer_orders_screen.dart';
+import 'customer_profile_screen.dart';
 
 class CustomerShopsScreen extends StatefulWidget {
   const CustomerShopsScreen({super.key});
@@ -66,16 +66,6 @@ class _CustomerShopsScreenState extends State<CustomerShopsScreen> {
     }
   }
 
-  Future<void> _logout() async {
-    await AuthService.signOut();
-    if (!mounted) return;
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-      (route) => false,
-    );
-  }
-
   void _openShop(CustomerBusiness business) {
     Navigator.push(
       context,
@@ -95,6 +85,10 @@ class _CustomerShopsScreenState extends State<CustomerShopsScreen> {
 
   void _openOrders() {
     Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerOrdersScreen()));
+  }
+
+  void _openProfile() {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerProfileScreen()));
   }
 
   void _startVoiceOrder() {
@@ -250,7 +244,7 @@ class _CustomerShopsScreenState extends State<CustomerShopsScreen> {
         ],
         rightItems: [
           AppNavItem(icon: Icons.receipt_long_outlined, label: 'Orders', onTap: _openOrders),
-          AppNavItem(icon: Icons.person_outline_rounded, label: 'Profile', onTap: _logout),
+          AppNavItem(icon: Icons.person_outline_rounded, label: 'Profile', onTap: _openProfile),
         ],
         onVoice: _startVoiceOrder,
       ),
