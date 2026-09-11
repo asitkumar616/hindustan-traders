@@ -141,15 +141,22 @@ class _OwnerOrdersScreenState extends State<OwnerOrdersScreen> {
                 else
                   ...items.map((item) {
                     final itemMap = item as Map<String, dynamic>;
-                    final product = (itemMap['product'] as Map<String, dynamic>?) ?? <String, dynamic>{};
-                    final productName = (product['name'] as String?) ?? 'Product';
-                    final qty = itemMap['quantity'] ?? 0;
+                    final productName = OrderService.itemProductName(itemMap);
+                    final quantityLabel = OrderService.itemQuantityLabel(itemMap);
                     final amount = (itemMap['amount'] as num?) ?? 0;
                     return Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
+                      padding: const EdgeInsets.only(bottom: 6),
                       child: Row(
                         children: [
-                          Expanded(child: Text('$productName × $qty', style: AppTextStyles.body)),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(productName, style: AppTextStyles.body),
+                                Text(quantityLabel, style: AppTextStyles.bodyMuted),
+                              ],
+                            ),
+                          ),
                           Text('₹${formatIndianAmount(amount)}', style: const TextStyle(fontWeight: FontWeight.w700)),
                         ],
                       ),

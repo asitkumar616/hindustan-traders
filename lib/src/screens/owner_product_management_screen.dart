@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import '../models/product_variant.dart';
 import '../models/voice_product_draft.dart';
 import '../services/auth_service.dart';
 import '../services/customer_business_service.dart';
@@ -19,6 +20,8 @@ import '../widgets/owner_nav_drawer.dart';
 import '../widgets/voice_order_card.dart';
 import 'add_product_voice_screen.dart';
 import 'login_screen.dart';
+import 'owner_configure_variants_screen.dart';
+import 'owner_master_catalog_screen.dart';
 import 'owner_orders_screen.dart';
 
 class OwnerProductManagementScreen extends StatefulWidget {
@@ -300,6 +303,33 @@ class _OwnerProductManagementScreenState extends State<OwnerProductManagementScr
     ).then((_) => _loadProducts());
   }
 
+  void _openAddFromCatalog() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => OwnerMasterCatalogScreen(businessId: widget.businessId)),
+    ).then((_) => _loadProducts());
+  }
+
+  void _editVariants(Map<String, dynamic> product) {
+    final variants = (product['variants'] as List<dynamic>? ?? const <dynamic>[])
+        .whereType<Map<String, dynamic>>()
+        .map(ProductVariant.fromMap)
+        .toList();
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OwnerConfigureVariantsScreen(
+          productId: product['id']?.toString() ?? '',
+          productName: product['name']?.toString() ?? 'Product',
+          businessId: widget.businessId,
+          baseUnit: product['unit']?.toString() ?? 'KG',
+          existingVariants: variants,
+        ),
+      ),
+    ).then((_) => _loadProducts());
+  }
+
   void _showVoiceOrderSheet() {
     showModalBottomSheet<void>(
       context: context,
@@ -398,7 +428,7 @@ class _OwnerProductManagementScreenState extends State<OwnerProductManagementScr
                                 padding: const EdgeInsets.only(bottom: AppSpacing.md),
                                 child: _OwnerProductCard(
                                   product: product,
-                                  onEdit: () => _showProductDialog(product: product),
+                                  onEdit: () => _editVariants(product),
                                   onDelete: () => _deleteProduct(product['id']?.toString() ?? ''),
                                 ),
                               );
@@ -412,9 +442,9 @@ class _OwnerProductManagementScreenState extends State<OwnerProductManagementScr
                 children: [
                   Expanded(
                     child: AppPrimaryButton(
-                      label: 'Add Product',
+                      label: 'Add from Catalog',
                       icon: Icons.add,
-                      onPressed: () => _showProductDialog(),
+                      onPressed: _openAddFromCatalog,
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),
@@ -500,8 +530,11 @@ class _OwnerProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = product['name']?.toString() ?? 'Product';
-    final unit = product['unit']?.toString() ?? 'unit';
-    final price = (product['price'] as num?) ?? 0;
+    final brand = product['brand']?.toString();
+    final variants = (product['variants'] as List<dynamic>? ?? const <dynamic>[])
+        .whereType<Map<String, dynamic>>()
+        .map(ProductVariant.fromMap)
+        .toList();
 
     return AppCard(
       child: Row(
@@ -522,8 +555,22 @@ class _OwnerProductCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(name, style: AppTextStyles.subheading),
-                const SizedBox(height: 2),
-                Text('₹${formatIndianAmount(price)} / $unit', style: AppTextStyles.bodyMuted),
+                if (brand != null && brand.isNotEmpty) Text(brand, style: AppTextStyles.caption),
+                const SizedBox(height: AppSpacing.xs),
+                if (variants.isEmpty)
+                  const Text('No pack sizes configured yet', style: AppTextStyles.bodyMuted)
+                else
+                  ...variants.map(
+                    (v) => Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Row(
+                        children: [
+                          Expanded(child: Text(v.label, style: AppTextStyles.bodyMuted)),
+                          Text('₹${formatIndianAmount(v.sellingPrice)}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                  ),
                 const SizedBox(height: AppSpacing.sm),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../models/master_product.dart';
 import '../models/user_profile.dart';
 import 'auth_service.dart';
 
@@ -145,7 +146,11 @@ class CustomerBusinessService {
           id,
           name,
           unit,
-          product_prices(price, valid_from)
+          category,
+          brand,
+          image_url,
+          master_product_id,
+          product_variants(id, quantity, unit, package_type, selling_price, minimum_order_quantity, stock_quantity, is_active)
         ''')
         .eq('business_id', businessId)
         .eq('is_active', true)
@@ -158,23 +163,30 @@ class CustomerBusinessService {
     required String businessId,
     required String name,
     required String unit,
+    String? category,
+    String? brand,
+    String? imageUrl,
+    String? masterProductId,
     bool isActive = true,
   }) {
     return {
       'business_id': businessId,
       'name': name.trim(),
       'unit': unit.trim().isEmpty ? 'unit' : unit.trim(),
+      'category': category,
+      'brand': brand,
+      'image_url': imageUrl,
+      'master_product_id': masterProductId,
       'is_active': isActive,
     };
   }
 
-  static Map<String, dynamic> buildPricePayload({required String productId, required double price}) {
-    return {
-      'product_id': productId,
-      'price': price,
-    };
-  }
-
+  /// Creates the owner's product row and a single LOOSE variant for it --
+  /// kept for the existing "Speak to add product" voice flow
+  /// (voice_product_result_screen.dart), which only ever collects one
+  /// name/unit/price. Manual product setup now goes through
+  /// createProductFromMasterProduct / createCustomProduct + addVariant,
+  /// which support multiple variants per product.
   static Future<Map<String, dynamic>?> createProduct({
     required String businessId,
     required String name,
@@ -197,12 +209,21 @@ class CustomerBusinessService {
 
     final productId = createdProduct['id'] as String?;
     if (productId != null) {
-      await client.from('product_prices').insert(buildPricePayload(productId: productId, price: price));
+      await addVariant(
+        productId: productId,
+        quantity: 1,
+        unit: _normalizeUnit(unit),
+        packageType: 'LOOSE',
+        sellingPrice: price,
+      );
     }
 
     return createdProduct;
   }
 
+  /// Updates the product's own fields and/or its single default variant --
+  /// kept for the voice-add flow's edit path. Multi-variant products should
+  /// use updateVariant directly instead.
   static Future<void> updateProduct({
     required String productId,
     required String businessId,
@@ -226,7 +247,26 @@ class CustomerBusinessService {
     }
 
     if (price != null) {
-      await client.from('product_prices').insert(buildPricePayload(productId: productId, price: price));
+      final existingVariant = await client
+          .from('product_variants')
+          .select('id')
+          .eq('product_id', productId)
+          .order('created_at', ascending: true)
+          .limit(1)
+          .maybeSingle();
+
+      if (existingVariant != null) {
+        await client.from('product_variants').update({'selling_price': price}).eq('id', existingVariant['id']);
+      } else {
+        await addVariant(
+          productId: productId,
+          quantity: 1,
+          unit: _normalizeUnit(unit ?? 'KG'),
+          packageType: 'LOOSE',
+          sellingPrice: price,
+        );
+      }
+
       await _notifyCustomersOfPriceChange(
         businessId: businessId,
         productName: name?.trim().isNotEmpty == true ? name!.trim() : 'A product',
@@ -234,6 +274,181 @@ class CustomerBusinessService {
         unit: unit,
       );
     }
+  }
+
+  static String _normalizeUnit(String rawUnit) {
+    final upper = rawUnit.trim().toUpperCase();
+    switch (upper) {
+      case 'LITRE':
+      case 'LITER':
+        return 'LTR';
+      case 'PIECE':
+      case 'PIECES':
+        return 'PCS';
+      default:
+        return kVariantUnits.contains(upper) ? upper : 'KG';
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // Master catalog
+  // ----------------------------------------------------------------
+
+  static Future<List<MasterProduct>> getMasterProducts({String? category, String? query}) async {
+    final client = _clientOrNull;
+    if (client == null) return [];
+
+    var builder = client.from('master_products').select().eq('is_active', true);
+    if (category != null && category.isNotEmpty && category != 'Others') {
+      builder = builder.eq('category', category);
+    }
+    if (query != null && query.trim().isNotEmpty) {
+      builder = builder.ilike('product_name', '%${query.trim()}%');
+    }
+
+    final response = await builder.order('product_name', ascending: true);
+    return (response as List).map((row) => MasterProduct.fromMap(row as Map<String, dynamic>)).toList();
+  }
+
+  /// Links an owner's shop to a shared catalog entry -- creates the owner's
+  /// own `products` row (business-scoped, per the multi-tenant model) with
+  /// master_product_id set for traceability, copying display fields from
+  /// the catalog entry as a starting point.
+  static Future<Map<String, dynamic>?> createProductFromMasterProduct({
+    required String businessId,
+    required MasterProduct masterProduct,
+    String? customName,
+  }) async {
+    final client = _clientOrNull;
+    if (client == null) return null;
+
+    final createdProduct = await client
+        .from('products')
+        .insert(buildProductPayload(
+          businessId: businessId,
+          name: customName?.trim().isNotEmpty == true ? customName!.trim() : masterProduct.productName,
+          unit: masterProduct.baseUnit,
+          category: masterProduct.category,
+          brand: masterProduct.brand,
+          imageUrl: masterProduct.imageUrl,
+          masterProductId: masterProduct.id,
+        ))
+        .select('id, name, unit, category, brand, image_url, master_product_id')
+        .single();
+
+    return createdProduct;
+  }
+
+  static Future<Map<String, dynamic>?> createCustomProduct({
+    required String businessId,
+    required String name,
+    required String baseUnit,
+    String? category,
+    String? brand,
+    String? imageUrl,
+  }) async {
+    final trimmedName = name.trim();
+    if (trimmedName.isEmpty) {
+      throw Exception('Product name is required');
+    }
+
+    final client = _clientOrNull;
+    if (client == null) return null;
+
+    final createdProduct = await client
+        .from('products')
+        .insert(buildProductPayload(
+          businessId: businessId,
+          name: trimmedName,
+          unit: baseUnit,
+          category: category,
+          brand: brand,
+          imageUrl: imageUrl,
+        ))
+        .select('id, name, unit, category, brand, image_url, master_product_id')
+        .single();
+
+    return createdProduct;
+  }
+
+  // ----------------------------------------------------------------
+  // Selling variants
+  // ----------------------------------------------------------------
+
+  static Future<Map<String, dynamic>?> addVariant({
+    required String productId,
+    required double quantity,
+    required String unit,
+    required String packageType,
+    required double sellingPrice,
+    double minimumOrderQuantity = 1,
+    double? stockQuantity,
+    bool isActive = true,
+  }) async {
+    final client = _clientOrNull;
+    if (client == null) return null;
+
+    return await client.from('product_variants').insert({
+      'product_id': productId,
+      'quantity': quantity,
+      'unit': unit,
+      'package_type': packageType,
+      'selling_price': sellingPrice,
+      'minimum_order_quantity': minimumOrderQuantity,
+      'stock_quantity': stockQuantity,
+      'is_active': isActive,
+    }).select().single();
+  }
+
+  /// Updates a single variant's fields. If [notifyBusinessId] is given and
+  /// the price changed, broadcasts a price-change notification the same way
+  /// the old flat updateProduct did.
+  static Future<void> updateVariant({
+    required String variantId,
+    double? quantity,
+    String? unit,
+    String? packageType,
+    double? sellingPrice,
+    double? minimumOrderQuantity,
+    double? stockQuantity,
+    bool? isActive,
+    String? notifyBusinessId,
+    String? notifyProductName,
+  }) async {
+    final client = _clientOrNull;
+    if (client == null) return;
+
+    final updates = <String, dynamic>{};
+    if (quantity != null) updates['quantity'] = quantity;
+    if (unit != null) updates['unit'] = unit;
+    if (packageType != null) updates['package_type'] = packageType;
+    if (sellingPrice != null) updates['selling_price'] = sellingPrice;
+    if (minimumOrderQuantity != null) updates['minimum_order_quantity'] = minimumOrderQuantity;
+    if (stockQuantity != null) updates['stock_quantity'] = stockQuantity;
+    if (isActive != null) updates['is_active'] = isActive;
+
+    if (updates.isEmpty) return;
+
+    await client.from('product_variants').update(updates).eq('id', variantId);
+
+    if (sellingPrice != null && notifyBusinessId != null) {
+      await _notifyCustomersOfPriceChange(
+        businessId: notifyBusinessId,
+        productName: notifyProductName ?? 'A product',
+        newPrice: sellingPrice,
+        unit: unit,
+      );
+    }
+  }
+
+  static Future<void> setVariantActive(String variantId, bool isActive) async {
+    final client = _clientOrNull;
+    if (client == null) return;
+    await client.from('product_variants').update({'is_active': isActive}).eq('id', variantId);
+  }
+
+  static Future<void> deleteVariant(String variantId) async {
+    await setVariantActive(variantId, false);
   }
 
   // Broadcasts a price change to every registered customer of this
@@ -314,21 +529,31 @@ class CustomerBusinessService {
     return response is Map<String, dynamic> ? response : null;
   }
 
+  /// Shapes a `products` row (with its embedded `product_variants`) into the
+  /// Map shape screens work with: keeps the existing flat `id/name/unit`
+  /// keys other callers already rely on, adds `variants` (only the active
+  /// ones, cheapest first) for variant-aware screens, and a `price` fallback
+  /// (cheapest active variant) so any code not yet updated for variants
+  /// still has a sane single price to show instead of crashing.
   static Map<String, dynamic> normalizeProductRow(Map<String, dynamic> row) {
-    final prices = (row['product_prices'] as List<dynamic>? ?? const <dynamic>[])
+    final variants = (row['product_variants'] as List<dynamic>? ?? const <dynamic>[])
         .whereType<Map<String, dynamic>>()
-        .toList();
+        .where((variant) => variant['is_active'] != false)
+        .toList()
+      ..sort((a, b) => ((a['selling_price'] as num?) ?? 0).compareTo((b['selling_price'] as num?) ?? 0));
 
-    num latestPrice = 0;
-    if (prices.isNotEmpty) {
-      latestPrice = prices.last['price'] as num? ?? 0;
-    }
+    final cheapest = variants.isNotEmpty ? variants.first : null;
 
     return {
       'id': row['id'],
       'name': row['name'],
       'unit': row['unit'],
-      'price': latestPrice,
+      'category': row['category'],
+      'brand': row['brand'],
+      'image_url': row['image_url'],
+      'master_product_id': row['master_product_id'],
+      'price': (cheapest?['selling_price'] as num?) ?? 0,
+      'variants': variants,
     };
   }
 

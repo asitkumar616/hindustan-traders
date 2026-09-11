@@ -19,25 +19,41 @@ class CartState extends ChangeNotifier {
   bool get isEmpty => _lines.isEmpty;
   double get subtotal => _lines.values.fold<double>(0, (sum, line) => sum + line.amount);
 
-  double quantityFor(String productId) => _lines[productId]?.quantity ?? 0;
+  double quantityFor(String variantId) => _lines[variantId]?.quantity ?? 0;
 
   void setQuantity({
     required String productId,
-    required String name,
-    required String unit,
+    required String variantId,
+    required String productName,
+    String? brand,
+    required double variantQuantity,
+    required String variantUnit,
+    required String packageType,
     required double price,
     required double quantity,
+    double minimumOrderQuantity = 1,
   }) {
     if (quantity <= 0) {
-      _lines.remove(productId);
+      _lines.remove(variantId);
     } else {
-      _lines[productId] = CartLine(productId: productId, name: name, unit: unit, price: price, quantity: quantity);
+      _lines[variantId] = CartLine(
+        productId: productId,
+        variantId: variantId,
+        productName: productName,
+        brand: brand,
+        variantQuantity: variantQuantity,
+        variantUnit: variantUnit,
+        packageType: packageType,
+        price: price,
+        quantity: quantity,
+        minimumOrderQuantity: minimumOrderQuantity,
+      );
     }
     notifyListeners();
   }
 
-  void removeLine(String productId) {
-    _lines.remove(productId);
+  void removeLine(String variantId) {
+    _lines.remove(variantId);
     notifyListeners();
   }
 

@@ -3,6 +3,7 @@ import '../screens/owner_coming_soon_screen.dart';
 import '../screens/owner_customer_management_screen.dart';
 import '../screens/owner_invoices_screen.dart';
 import '../screens/owner_orders_screen.dart';
+import '../screens/owner_price_update_screen.dart';
 import '../screens/owner_product_management_screen.dart';
 import '../screens/owner_reports_screen.dart';
 import '../screens/owner_transactions_screen.dart';
@@ -69,8 +70,8 @@ class OwnerNavDrawer extends StatelessWidget {
             ),
             ListTile(
               leading: const Icon(Icons.sell_outlined),
-              title: const Text('Price Management'),
-              onTap: () => onNavigate(const OwnerComingSoonScreen(title: 'Price Management')),
+              title: const Text('Price Update'),
+              onTap: () => onNavigate(OwnerPriceUpdateScreen(businessId: businessId)),
             ),
             ListTile(
               leading: const Icon(Icons.person_outline),

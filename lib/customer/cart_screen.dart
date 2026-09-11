@@ -108,17 +108,24 @@ class _CartScreenState extends State<CartScreen> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text(line.name, style: AppTextStyles.subheading),
+                                      Text(line.productName, style: AppTextStyles.subheading),
+                                      const SizedBox(height: 2),
+                                      Text(line.variantLabel, style: AppTextStyles.bodyMuted),
                                       const SizedBox(height: AppSpacing.sm),
                                       AppQuantityStepper(
                                         quantity: line.quantity,
-                                        unit: line.unit,
+                                        unit: line.packageType == 'LOOSE' ? line.variantUnit : line.packageType,
                                         onChanged: (next) => cart.setQuantity(
                                           productId: line.productId,
-                                          name: line.name,
-                                          unit: line.unit,
+                                          variantId: line.variantId,
+                                          productName: line.productName,
+                                          brand: line.brand,
+                                          variantQuantity: line.variantQuantity,
+                                          variantUnit: line.variantUnit,
+                                          packageType: line.packageType,
                                           price: line.price,
                                           quantity: next,
+                                          minimumOrderQuantity: line.minimumOrderQuantity,
                                         ),
                                       ),
                                     ],

@@ -241,10 +241,21 @@ class OrderDraftService {
         lines.map((line) => {
           'order_id': orderId,
           'product_id': line.productId,
+          // Legacy columns: quantity/unit describe "how many of the sold
+          // unit" (e.g. 50 BAG), kept for any code still reading the flat
+          // shape. The variant_* columns below are the full-fidelity
+          // snapshot -- see submitDraft's comment on why this is snapshotted
+          // at order time rather than read live off product_variants later.
           'quantity': line.quantity,
-          'unit': line.unit,
+          'unit': line.packageType == 'LOOSE' ? line.variantUnit : line.packageType,
           'price': line.price,
           'amount': line.amount,
+          'variant_id': line.variantId,
+          'product_name': line.productName,
+          'brand': line.brand,
+          'variant_quantity': line.variantQuantity,
+          'variant_unit': line.variantUnit,
+          'package_type': line.packageType,
         }).toList(),
       );
 

@@ -64,7 +64,11 @@ class OrderService {
 
     final response = await client
         .from('order_items')
-        .select('id, product_id, quantity, unit, price, amount, product:products!order_items_product_id_fkey(name)')
+        .select(
+          'id, product_id, quantity, unit, price, amount, '
+          'variant_id, product_name, brand, variant_quantity, variant_unit, package_type, '
+          'product:products!order_items_product_id_fkey(name)',
+        )
         .eq('order_id', orderId);
 
     return List<Map<String, dynamic>>.from(response as List);
@@ -91,6 +95,12 @@ class OrderService {
             unit,
             price,
             amount,
+            variant_id,
+            product_name,
+            brand,
+            variant_quantity,
+            variant_unit,
+            package_type,
             product:products!order_items_product_id_fkey(name)
           )
         ''')
@@ -125,6 +135,40 @@ class OrderService {
       'body': notification.$2,
       'data': {'order_id': orderId, 'status': status},
     });
+  }
+
+  /// Product name for one order_item -- prefers the snapshot taken at order
+  /// time (survives the product being renamed/deleted later) and falls back
+  /// to the live joined product name for pre-migration rows that predate
+  /// the snapshot columns.
+  static String itemProductName(Map<String, dynamic> item) {
+    final snapshot = item['product_name']?.toString();
+    if (snapshot != null && snapshot.isNotEmpty) return snapshot;
+    final product = item['product'] as Map<String, dynamic>?;
+    return product?['name']?.toString() ?? 'Product';
+  }
+
+  /// "50 × 25 KG BAG" style quantity label for one order_item -- built from
+  /// the variant snapshot when present, otherwise falls back to the legacy
+  /// flat quantity/unit for orders placed before variants existed.
+  static String itemQuantityLabel(Map<String, dynamic> item) {
+    final orderedQty = item['quantity'];
+    final variantQuantity = (item['variant_quantity'] as num?)?.toDouble();
+    final variantUnit = item['variant_unit']?.toString();
+
+    if (variantQuantity != null && variantUnit != null && variantUnit.isNotEmpty) {
+      final packageType = item['package_type']?.toString();
+      final qtyStr = variantQuantity == variantQuantity.roundToDouble()
+          ? variantQuantity.toInt().toString()
+          : variantQuantity.toString();
+      final variantLabel = (packageType == null || packageType.isEmpty || packageType == 'LOOSE')
+          ? '$qtyStr $variantUnit'
+          : '$qtyStr $variantUnit $packageType';
+      return '$orderedQty × $variantLabel';
+    }
+
+    final unit = item['unit']?.toString() ?? '';
+    return '$orderedQty $unit';
   }
 
   static String formatDisplayDate(String? timestamp) {

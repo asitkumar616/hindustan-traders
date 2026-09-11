@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../src/models/product_variant.dart';
 import '../src/screens/login_screen.dart';
 import '../src/services/auth_service.dart';
 import '../src/services/cart_state.dart';
@@ -310,9 +311,16 @@ class _ProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final id = product['id']?.toString() ?? '';
     final name = product['name']?.toString() ?? 'Product';
-    final unit = product['unit']?.toString() ?? 'unit';
-    final price = (product['price'] as num?)?.toDouble() ?? 0;
-    final quantity = cart.quantityFor(id);
+    final brand = product['brand']?.toString();
+    final variants = (product['variants'] as List<dynamic>? ?? const <dynamic>[])
+        .whereType<Map<String, dynamic>>()
+        .map(ProductVariant.fromMap)
+        .toList();
+    final variantCount = variants.length;
+    // Quick-add on the catalog card always targets the cheapest variant;
+    // picking a different pack size means opening the product detail sheet.
+    final defaultVariant = variants.isNotEmpty ? variants.first : null;
+    final quantity = defaultVariant != null ? cart.quantityFor(defaultVariant.id) : 0.0;
 
     return AppCard(
       onTap: onTap,
@@ -331,17 +339,39 @@ class _ProductCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(name, style: AppTextStyles.subheading),
+                if (brand != null && brand.isNotEmpty) ...[
+                  const SizedBox(height: 1),
+                  Text(brand, style: AppTextStyles.caption),
+                ],
                 const SizedBox(height: 2),
-                Text(
-                  '₹${formatIndianAmount(price)} / $unit',
-                  style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 13),
-                ),
+                if (defaultVariant == null)
+                  const Text('Not available', style: AppTextStyles.bodyMuted)
+                else
+                  Text(
+                    variantCount > 1
+                        ? '₹${formatIndianAmount(defaultVariant.sellingPrice)} / ${defaultVariant.label} · $variantCount sizes'
+                        : '₹${formatIndianAmount(defaultVariant.sellingPrice)} / ${defaultVariant.label}',
+                    style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 13),
+                  ),
                 const SizedBox(height: AppSpacing.sm),
-                if (quantity > 0)
+                if (defaultVariant == null)
+                  const SizedBox.shrink()
+                else if (quantity > 0)
                   AppQuantityStepper(
                     quantity: quantity,
-                    unit: unit,
-                    onChanged: (next) => cart.setQuantity(productId: id, name: name, unit: unit, price: price, quantity: next),
+                    unit: defaultVariant.packageType == 'LOOSE' ? defaultVariant.unit : defaultVariant.packageType,
+                    onChanged: (next) => cart.setQuantity(
+                      productId: id,
+                      variantId: defaultVariant.id,
+                      productName: name,
+                      brand: brand,
+                      variantQuantity: defaultVariant.quantity,
+                      variantUnit: defaultVariant.unit,
+                      packageType: defaultVariant.packageType,
+                      price: defaultVariant.sellingPrice,
+                      quantity: next,
+                      minimumOrderQuantity: defaultVariant.minimumOrderQuantity,
+                    ),
                   )
                 else
                   SizedBox(
@@ -349,7 +379,18 @@ class _ProductCard extends StatelessWidget {
                     child: ElevatedButton.icon(
                       onPressed: id.isEmpty
                           ? null
-                          : () => cart.setQuantity(productId: id, name: name, unit: unit, price: price, quantity: 1),
+                          : () => cart.setQuantity(
+                                productId: id,
+                                variantId: defaultVariant.id,
+                                productName: name,
+                                brand: brand,
+                                variantQuantity: defaultVariant.quantity,
+                                variantUnit: defaultVariant.unit,
+                                packageType: defaultVariant.packageType,
+                                price: defaultVariant.sellingPrice,
+                                quantity: defaultVariant.minimumOrderQuantity > 0 ? defaultVariant.minimumOrderQuantity : 1,
+                                minimumOrderQuantity: defaultVariant.minimumOrderQuantity,
+                              ),
                       icon: const Icon(Icons.add_rounded, size: 16),
                       label: const Text('Add'),
                       style: ElevatedButton.styleFrom(

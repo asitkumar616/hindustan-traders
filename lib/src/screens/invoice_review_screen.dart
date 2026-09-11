@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/order_service.dart';
 import '../services/receipt_pdf_service.dart';
 
 class InvoiceReviewScreen extends StatefulWidget {
@@ -84,7 +85,11 @@ class _InvoiceReviewScreenState extends State<InvoiceReviewScreen> {
     try {
       final response = await Supabase.instance.client
           .from('order_items')
-          .select('id, quantity, unit, price, amount, product:products!order_items_product_id_fkey(name)')
+          .select(
+            'id, quantity, unit, price, amount, '
+            'variant_id, product_name, brand, variant_quantity, variant_unit, package_type, '
+            'product:products!order_items_product_id_fkey(name)',
+          )
           .eq('order_id', orderId);
 
       if (!mounted) return;
@@ -254,6 +259,25 @@ class _InvoiceReviewScreenState extends State<InvoiceReviewScreen> {
     );
   }
 
+  /// Receipt PDF template renders each line as "{quantity} {unit}", so for
+  /// variant items this returns "× 25 KG BAG" (making "50 × 25 KG BAG"),
+  /// falling back to the legacy flat unit for pre-migration order_items.
+  String _receiptUnitLabel(Map<String, dynamic> item) {
+    final variantQuantity = (item['variant_quantity'] as num?)?.toDouble();
+    final variantUnit = item['variant_unit']?.toString();
+    if (variantQuantity != null && variantUnit != null && variantUnit.isNotEmpty) {
+      final packageType = item['package_type']?.toString();
+      final qtyStr = variantQuantity == variantQuantity.roundToDouble()
+          ? variantQuantity.toInt().toString()
+          : variantQuantity.toString();
+      final variantLabel = (packageType == null || packageType.isEmpty || packageType == 'LOOSE')
+          ? '$qtyStr $variantUnit'
+          : '$qtyStr $variantUnit $packageType';
+      return '× $variantLabel';
+    }
+    return item['unit']?.toString() ?? '';
+  }
+
   Future<void> _printReceipt() async {
     final invoice = _invoice;
     if (invoice == null) return;
@@ -269,11 +293,10 @@ class _InvoiceReviewScreenState extends State<InvoiceReviewScreen> {
         documentNumber: invoice['invoice_number']?.toString() ?? 'Invoice',
         date: createdAt,
         items: _lineItems.map((item) {
-          final product = (item['product'] as Map<String, dynamic>?) ?? <String, dynamic>{};
           return ReceiptLine(
-            name: product['name']?.toString() ?? 'Item',
+            name: OrderService.itemProductName(item),
             quantity: (item['quantity'] as num?) ?? 0,
-            unit: item['unit']?.toString() ?? '',
+            unit: _receiptUnitLabel(item),
             price: (item['price'] as num?) ?? 0,
             amount: (item['amount'] as num?) ?? 0,
           );
@@ -305,12 +328,10 @@ class _InvoiceReviewScreenState extends State<InvoiceReviewScreen> {
       ..writeln('---');
 
     for (final item in _lineItems) {
-      final product = (item['product'] as Map<String, dynamic>?) ?? <String, dynamic>{};
-      final name = product['name']?.toString() ?? 'Item';
-      final qty = item['quantity'];
-      final unit = item['unit']?.toString() ?? '';
+      final name = OrderService.itemProductName(item);
+      final quantityLabel = OrderService.itemQuantityLabel(item);
       final amount = (item['amount'] as num?) ?? 0;
-      buffer.writeln('$name x $qty $unit - ₹${amount.toStringAsFixed(0)}');
+      buffer.writeln('$name x $quantityLabel - ₹${amount.toStringAsFixed(0)}');
     }
 
     buffer
@@ -355,10 +376,8 @@ class _InvoiceReviewScreenState extends State<InvoiceReviewScreen> {
                       const Text('No item breakdown available for this invoice.', style: TextStyle(color: Colors.black54))
                     else
                       ..._lineItems.map((item) {
-                        final product = (item['product'] as Map<String, dynamic>?) ?? <String, dynamic>{};
-                        final name = product['name']?.toString() ?? 'Item';
-                        final qty = item['quantity'];
-                        final unit = item['unit']?.toString() ?? '';
+                        final name = OrderService.itemProductName(item);
+                        final quantityLabel = OrderService.itemQuantityLabel(item);
                         final price = (item['price'] as num?) ?? 0;
                         final amount = (item['amount'] as num?) ?? 0;
                         return Padding(
@@ -370,7 +389,7 @@ class _InvoiceReviewScreenState extends State<InvoiceReviewScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                    Text('$qty $unit • ₹${price.toStringAsFixed(0)}/$unit', style: const TextStyle(color: Colors.black54, fontSize: 12)),
+                                    Text('$quantityLabel • ₹${price.toStringAsFixed(0)} each', style: const TextStyle(color: Colors.black54, fontSize: 12)),
                                   ],
                                 ),
                               ),
