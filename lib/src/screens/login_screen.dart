@@ -5,6 +5,7 @@ import '../localization/app_localizations.dart';
 import '../services/app_state.dart';
 import '../services/auth_service.dart';
 import '../services/role_router.dart';
+import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
@@ -115,7 +116,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     AppErrorState(message: appState.backendStatus),
                     const SizedBox(height: AppSpacing.lg),
                   ],
-                  Text(localized.translate('login_title'), style: AppTextStyles.heading),
+                  Text(
+                    localized.translate('login_title'),
+                    style: AppTextStyles.heading.copyWith(color: AppColors.navy),
+                  ),
                   const SizedBox(height: AppSpacing.xs),
                   const Text(
                     'Enter your mobile number to continue',

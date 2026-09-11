@@ -146,6 +146,7 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
                     AppFilterChip(
                       label: 'All',
                       selected: _selectedBusinessId == 'all',
+                      selectedColor: AppColors.navy,
                       onTap: () => setState(() => _selectedBusinessId = 'all'),
                     ),
                     const SizedBox(width: AppSpacing.sm),
@@ -153,6 +154,7 @@ class _CustomerOrdersScreenState extends State<CustomerOrdersScreen> {
                           AppFilterChip(
                             label: business.businessName,
                             selected: _selectedBusinessId == business.businessId,
+                            selectedColor: AppColors.navy,
                             onTap: () => setState(() => _selectedBusinessId = business.businessId),
                           ),
                           const SizedBox(width: AppSpacing.sm),

@@ -9,9 +9,11 @@ import '../src/theme/app_colors.dart';
 import '../src/theme/app_radius.dart';
 import '../src/theme/app_spacing.dart';
 import '../src/theme/app_text_styles.dart';
+import '../src/utils/category_visuals.dart';
 import '../src/utils/formatters.dart';
 import '../src/widgets/app_card.dart';
 import '../src/widgets/app_empty_state.dart';
+import '../src/widgets/app_filter_chip.dart';
 import '../src/widgets/app_loading_state.dart';
 import '../src/widgets/app_quantity_stepper.dart';
 import '../src/widgets/app_voice_bottom_nav.dart';
@@ -40,6 +42,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   List<Map<String, dynamic>> _products = const <Map<String, dynamic>>[];
   List<Map<String, dynamic>> _filteredProducts = const <Map<String, dynamic>>[];
   bool _isLoadingCatalog = true;
+  String _category = 'All';
 
   @override
   void initState() {
@@ -73,12 +76,23 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     _applyFilter();
   }
 
+  List<String> get _categories {
+    final seen = <String>{};
+    for (final product in _products) {
+      final category = product['category']?.toString();
+      if (category != null && category.isNotEmpty) seen.add(category);
+    }
+    return ['All', ...seen];
+  }
+
   void _applyFilter() {
     final query = _searchController.text.trim().toLowerCase();
     setState(() {
-      _filteredProducts = query.isEmpty
-          ? _products
-          : _products.where((product) => (product['name']?.toString() ?? '').toLowerCase().contains(query)).toList();
+      _filteredProducts = _products.where((product) {
+        final matchesQuery = query.isEmpty || (product['name']?.toString() ?? '').toLowerCase().contains(query);
+        final matchesCategory = _category == 'All' || product['category']?.toString() == _category;
+        return matchesQuery && matchesCategory;
+      }).toList();
     });
   }
 
@@ -205,10 +219,34 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   ),
                   const SizedBox(height: AppSpacing.md),
                   _SearchField(controller: _searchController),
-                  const SizedBox(height: AppSpacing.lg),
                 ],
               ),
             ),
+            if (_categories.length > 1) ...[
+              const SizedBox(height: AppSpacing.md),
+              SizedBox(
+                height: 36,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+                  itemCount: _categories.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
+                  itemBuilder: (context, index) {
+                    final category = _categories[index];
+                    return AppFilterChip(
+                      label: category,
+                      selected: _category == category,
+                      selectedColor: AppColors.navy,
+                      onTap: () {
+                        setState(() => _category = category);
+                        _applyFilter();
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+            const SizedBox(height: AppSpacing.lg),
             Expanded(
               child: RefreshIndicator(
                 onRefresh: refreshCatalog,
@@ -321,6 +359,7 @@ class _ProductCard extends StatelessWidget {
     // picking a different pack size means opening the product detail sheet.
     final defaultVariant = variants.isNotEmpty ? variants.first : null;
     final quantity = defaultVariant != null ? cart.quantityFor(defaultVariant.id) : 0.0;
+    final visual = categoryVisual(product['category']?.toString());
 
     return AppCard(
       onTap: onTap,
@@ -328,10 +367,10 @@ class _ProductCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(AppRadius.sm)),
-            child: const Icon(Icons.shopping_basket_outlined, color: AppColors.primary),
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(color: visual.color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(AppRadius.sm)),
+            child: Icon(visual.icon, color: visual.color, size: 28),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
@@ -346,18 +385,20 @@ class _ProductCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 if (defaultVariant == null)
                   const Text('Not available', style: AppTextStyles.bodyMuted)
-                else
+                else ...[
                   Text(
-                    variantCount > 1
-                        ? '₹${formatIndianAmount(defaultVariant.sellingPrice)} / ${defaultVariant.label} · $variantCount sizes'
-                        : '₹${formatIndianAmount(defaultVariant.sellingPrice)} / ${defaultVariant.label}',
-                    style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 13),
+                    '₹${formatIndianAmount(defaultVariant.sellingPrice)} / ${defaultVariant.label}',
+                    style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w800, fontSize: 14),
                   ),
-                const SizedBox(height: AppSpacing.sm),
-                if (defaultVariant == null)
-                  const SizedBox.shrink()
-                else if (quantity > 0)
-                  AppQuantityStepper(
+                  if (variantCount > 1)
+                    Text('$variantCount pack sizes available', style: AppTextStyles.caption),
+                ],
+              ],
+            ),
+          ),
+          if (defaultVariant != null)
+            quantity > 0
+                ? AppQuantityStepper(
                     quantity: quantity,
                     unit: defaultVariant.packageType == 'LOOSE' ? defaultVariant.unit : defaultVariant.packageType,
                     onChanged: (next) => cart.setQuantity(
@@ -373,35 +414,29 @@ class _ProductCard extends StatelessWidget {
                       minimumOrderQuantity: defaultVariant.minimumOrderQuantity,
                     ),
                   )
-                else
-                  SizedBox(
-                    height: 32,
-                    child: ElevatedButton.icon(
-                      onPressed: id.isEmpty
-                          ? null
-                          : () => cart.setQuantity(
-                                productId: id,
-                                variantId: defaultVariant.id,
-                                productName: name,
-                                brand: brand,
-                                variantQuantity: defaultVariant.quantity,
-                                variantUnit: defaultVariant.unit,
-                                packageType: defaultVariant.packageType,
-                                price: defaultVariant.sellingPrice,
-                                quantity: defaultVariant.minimumOrderQuantity > 0 ? defaultVariant.minimumOrderQuantity : 1,
-                                minimumOrderQuantity: defaultVariant.minimumOrderQuantity,
-                              ),
-                      icon: const Icon(Icons.add_rounded, size: 16),
-                      label: const Text('Add'),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
-                        textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-                      ),
+                : InkWell(
+                    onTap: id.isEmpty
+                        ? null
+                        : () => cart.setQuantity(
+                              productId: id,
+                              variantId: defaultVariant.id,
+                              productName: name,
+                              brand: brand,
+                              variantQuantity: defaultVariant.quantity,
+                              variantUnit: defaultVariant.unit,
+                              packageType: defaultVariant.packageType,
+                              price: defaultVariant.sellingPrice,
+                              quantity: defaultVariant.minimumOrderQuantity > 0 ? defaultVariant.minimumOrderQuantity : 1,
+                              minimumOrderQuantity: defaultVariant.minimumOrderQuantity,
+                            ),
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: const BoxDecoration(color: AppColors.success, shape: BoxShape.circle),
+                      child: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
                     ),
                   ),
-              ],
-            ),
-          ),
         ],
       ),
     );

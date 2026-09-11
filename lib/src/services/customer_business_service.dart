@@ -314,10 +314,18 @@ class CustomerBusinessService {
   /// own `products` row (business-scoped, per the multi-tenant model) with
   /// master_product_id set for traceability, copying display fields from
   /// the catalog entry as a starting point.
+  /// [brandOverride] and [customName] let the same catalog entry (e.g. the
+  /// generic "Rice" master product) be added multiple times under different
+  /// brands -- "Kohinoor Rice", "India Gate Rice", etc. -- as separate
+  /// `products` rows, each linked back to the same master_product_id. This
+  /// is deliberately allowed to repeat: nothing here checks for an existing
+  /// product with the same master_product_id, since one owner may
+  /// legitimately stock several brands of the same generic item.
   static Future<Map<String, dynamic>?> createProductFromMasterProduct({
     required String businessId,
     required MasterProduct masterProduct,
     String? customName,
+    String? brandOverride,
   }) async {
     final client = _clientOrNull;
     if (client == null) return null;
@@ -329,7 +337,7 @@ class CustomerBusinessService {
           name: customName?.trim().isNotEmpty == true ? customName!.trim() : masterProduct.productName,
           unit: masterProduct.baseUnit,
           category: masterProduct.category,
-          brand: masterProduct.brand,
+          brand: brandOverride?.trim().isNotEmpty == true ? brandOverride!.trim() : masterProduct.brand,
           imageUrl: masterProduct.imageUrl,
           masterProductId: masterProduct.id,
         ))

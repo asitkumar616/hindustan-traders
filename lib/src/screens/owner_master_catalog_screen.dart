@@ -9,6 +9,7 @@ import '../widgets/app_card.dart';
 import '../widgets/app_empty_state.dart';
 import '../widgets/app_filter_chip.dart';
 import '../widgets/app_loading_state.dart';
+import '../widgets/app_primary_button.dart';
 import 'owner_configure_variants_screen.dart';
 import 'owner_custom_product_screen.dart';
 
@@ -65,12 +66,87 @@ class _OwnerMasterCatalogScreenState extends State<OwnerMasterCatalogScreen> {
     }
   }
 
+  /// Asks which brand this is before creating the product -- lets the same
+  /// catalog entry (e.g. "Rice") be added more than once under different
+  /// brands ("Kohinoor Rice", "India Gate Rice"), each becoming its own
+  /// card in the shop.
+  Future<({String brand, String displayName})?> _promptBrand(MasterProduct product) async {
+    final brandController = TextEditingController();
+    final nameController = TextEditingController(text: product.productName);
+    var nameEdited = false;
+
+    return showModalBottomSheet<({String brand, String displayName})>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.xl,
+                AppSpacing.lg,
+                AppSpacing.xl,
+                MediaQuery.of(sheetContext).viewInsets.bottom + AppSpacing.xl,
+              ),
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Add ${product.productName} to My Shop', style: AppTextStyles.heading),
+                    const SizedBox(height: AppSpacing.xs),
+                    const Text(
+                      'If you stock more than one brand, add each one separately -- they\'ll show as separate cards.',
+                      style: AppTextStyles.bodyMuted,
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    TextField(
+                      controller: brandController,
+                      decoration: const InputDecoration(labelText: 'Brand (e.g. Kohinoor)'),
+                      onChanged: (value) {
+                        if (nameEdited) return;
+                        setSheetState(() {
+                          nameController.text = value.trim().isEmpty ? product.productName : '${value.trim()} ${product.productName}';
+                        });
+                      },
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(labelText: 'Display Name'),
+                      onChanged: (_) => nameEdited = true,
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    AppPrimaryButton(
+                      label: 'Continue to Selling Options',
+                      onPressed: () => Navigator.pop(
+                        sheetContext,
+                        (brand: brandController.text.trim(), displayName: nameController.text.trim()),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _addToShop(MasterProduct product) async {
+    final choice = await _promptBrand(product);
+    if (choice == null) return;
+
     setState(() => _adding = true);
     try {
       final created = await CustomerBusinessService.createProductFromMasterProduct(
         businessId: widget.businessId,
         masterProduct: product,
+        customName: choice.displayName,
+        brandOverride: choice.brand,
       );
       if (!mounted || created == null) return;
 

@@ -6,6 +6,7 @@ import '../src/theme/app_colors.dart';
 import '../src/theme/app_radius.dart';
 import '../src/theme/app_spacing.dart';
 import '../src/theme/app_text_styles.dart';
+import '../src/utils/category_visuals.dart';
 import '../src/utils/formatters.dart';
 import '../src/widgets/app_quantity_stepper.dart';
 import '../src/widgets/app_section_header.dart';
@@ -76,15 +77,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: double.infinity,
-                      height: 220,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(AppRadius.lg),
-                      ),
-                      child: const Icon(Icons.shopping_basket_outlined, color: AppColors.primary, size: 72),
-                    ),
+                    Builder(builder: (context) {
+                      final visual = categoryVisual(widget.product['category']?.toString());
+                      return Container(
+                        width: double.infinity,
+                        height: 220,
+                        decoration: BoxDecoration(
+                          color: visual.color.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(AppRadius.lg),
+                        ),
+                        child: Icon(visual.icon, color: visual.color, size: 72),
+                      );
+                    }),
                     const SizedBox(height: AppSpacing.xl),
                     Text(name, style: AppTextStyles.heading),
                     if (brand != null && brand.isNotEmpty) ...[
@@ -211,9 +215,9 @@ class _VariantChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary : Colors.white,
+          color: selected ? AppColors.navy : Colors.white,
           borderRadius: BorderRadius.circular(AppRadius.sm),
-          border: Border.all(color: selected ? AppColors.primary : AppColors.divider),
+          border: Border.all(color: selected ? AppColors.navy : AppColors.divider),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

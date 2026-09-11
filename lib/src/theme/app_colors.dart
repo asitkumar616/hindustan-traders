@@ -7,27 +7,47 @@ import 'package:flutter/material.dart';
 class AppColors {
   AppColors._();
 
-  static const Color primary = Color(0xFF176B43);
-  static const Color primaryLight = Color(0xFF2E9E6B);
-  static const Color accent = Color(0xFFC98A2C);
+  // OdiaTraders brand palette (2026 mockup): saffron/orange drives every
+  // primary call-to-action button (Continue, Add to Cart, Place Order,
+  // Save...), navy is the structural color (headings, selected states, icon
+  // badges), used consistently across Customer/Owner/Admin -- unlike the
+  // earlier role-differentiated green/purple/blue scheme, this mockup uses
+  // ONE identity everywhere.
+  static const Color primary = Color(0xFFF5841F);
+  static const Color primaryLight = Color(0xFFFFA94D);
+  static const Color primaryDark = Color(0xFFD96E0F);
 
-  static const Color success = Color(0xFF2E7D32);
+  static const Color navy = Color(0xFF17325C);
+  static const Color navyLight = Color(0xFF2C4E82);
+  static const Color navyDark = Color(0xFF0F2140);
+
+  static const Color accent = Color(0xFF17325C);
+
+  static const Color success = Color(0xFF2E9E5B);
   static const Color warning = Color(0xFFB98A1F);
   static const Color danger = Color(0xFFC62828);
-  static const Color info = Color(0xFF1565C0);
+  static const Color info = Color(0xFF3B82F6);
 
   static const Color textPrimary = Color(0xFF1A1D1B);
   static const Color textSecondary = Color(0xFF6B7280);
   static const Color divider = Color(0xFFE5E7EB);
   static const Color surfaceMuted = Color(0xFFF4F6F5);
 
-  // Owner app accent -- scoped to the Owner Dashboard redesign, which uses a
-  // purple/indigo identity distinct from the Customer app's green. Not wired
-  // into the global ThemeData/ColorScheme so other Owner screens are
-  // unaffected until they're redesigned too.
-  static const Color ownerPrimary = Color(0xFF6C5CE7);
-  static const Color ownerPrimaryDark = Color(0xFF5B4BD6);
-  static const Color ownerPrimaryLight = Color(0xFF8579F2);
+  // Category icon accents -- the mockup's category grid/badges use a mixed
+  // palette (not one dominant color), so these are shared across whichever
+  // screens render category chips/icons.
+  static const Color categoryRice = Color(0xFFF5841F);
+  static const Color categoryDal = Color(0xFF7C6EF2);
+  static const Color categoryOil = Color(0xFFE0A72E);
+  static const Color categorySpice = Color(0xFFC62828);
+  static const Color categoryOther = Color(0xFF3B82F6);
+
+  // Kept as aliases so existing Owner/Admin screens immediately pick up the
+  // unified navy identity instead of their old purple/blue without needing
+  // every call site rewritten in this pass.
+  static const Color ownerPrimary = navy;
+  static const Color ownerPrimaryDark = navyDark;
+  static const Color ownerPrimaryLight = navyLight;
 
   static const Color statCustomersBg = Color(0xFFEFE9FF);
   static const Color statCustomersFg = Color(0xFF7C6EF2);
@@ -38,10 +58,7 @@ class AppColors {
   static const Color statAmountBg = Color(0xFFFFE3EC);
   static const Color statAmountFg = Color(0xFFEF5DA8);
 
-  // Admin app accent -- a neutral blue distinct from Owner's purple and
-  // Customer's green, matching the icon-badge-only styling of the Admin
-  // screens in the mockup (no single dominant hero-card color to sample).
-  static const Color adminPrimary = Color(0xFF2563EB);
-  static const Color adminPrimaryDark = Color(0xFF1D4ED8);
-  static const Color adminPrimaryLight = Color(0xFF3B82F6);
+  static const Color adminPrimary = navy;
+  static const Color adminPrimaryDark = navyDark;
+  static const Color adminPrimaryLight = navyLight;
 }

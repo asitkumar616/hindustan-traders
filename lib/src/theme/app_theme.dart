@@ -7,8 +7,8 @@ import 'package:flutter/material.dart';
 class AppTheme {
   AppTheme._();
 
-  static const Color _seed = Color(0xFF176B43);
-  static const Color _accent = Color(0xFFC98A2C);
+  static const Color _seed = Color(0xFFF5841F);
+  static const Color _accent = Color(0xFF17325C);
 
   static const double radiusSmall = 10;
   static const double radiusMedium = 14;
