@@ -17,7 +17,7 @@ class InvoiceReviewScreen extends StatefulWidget {
 class _InvoiceReviewScreenState extends State<InvoiceReviewScreen> {
   Map<String, dynamic>? _invoice;
   List<Map<String, dynamic>> _lineItems = [];
-  String _businessName = 'Hindustan Traders';
+  String _businessName = 'Your Shop';
   bool _loading = true;
   bool _recordingPayment = false;
   bool _printing = false;

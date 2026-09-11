@@ -10,14 +10,14 @@ import 'src/theme/app_theme.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final appState = AppState();
-  runApp(HindustanTradersApp(appState: appState));
+  runApp(OdiaTradersApp(appState: appState));
   unawaited(appState.init());
 }
 
-class HindustanTradersApp extends StatelessWidget {
+class OdiaTradersApp extends StatelessWidget {
   final AppState appState;
 
-  const HindustanTradersApp({super.key, required this.appState});
+  const OdiaTradersApp({super.key, required this.appState});
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +25,7 @@ class HindustanTradersApp extends StatelessWidget {
       value: appState,
       child: Consumer<AppState>(builder: (context, state, child) {
         return MaterialApp(
-          title: 'Hindustan Traders',
+          title: 'OdiaTraders',
           theme: AppTheme.light,
           locale: state.locale,
           supportedLocales: AppLocalizations.supportedLocales,

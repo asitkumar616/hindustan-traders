@@ -66,7 +66,7 @@ class BrandLogo extends StatelessWidget {
         if (showLabel) ...[
           const SizedBox(height: 14),
           Text(
-            'Hindustan Traders',
+            'OdiaTraders',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w800,

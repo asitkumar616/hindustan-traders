@@ -156,7 +156,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       Icon(Icons.verified_rounded, size: 16, color: colorScheme.primary),
                       const SizedBox(width: AppSpacing.xs),
-                      const Text('Powered by Hindustan Traders', style: AppTextStyles.caption),
+                      const Text('Powered by OdiaTraders', style: AppTextStyles.caption),
                     ],
                   ),
                 ],

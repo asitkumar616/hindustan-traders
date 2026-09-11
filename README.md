@@ -1,6 +1,6 @@
-# Hindustan Traders
+# OdiaTraders
 
-A production-ready wholesale grocery ordering app for Hindustan Traders.
+A production-ready wholesale grocery ordering app for OdiaTraders.
 
 ## Project setup
 

@@ -12,7 +12,7 @@ class AdminLoginScreen extends StatefulWidget {
 
 class _AdminLoginScreenState extends State<AdminLoginScreen> {
   static const String _adminUsername = String.fromEnvironment('ADMIN_USERNAME', defaultValue: 'admin');
-  static const String _adminPassword = String.fromEnvironment('ADMIN_PASSWORD', defaultValue: 'Hindustan@123');
+  static const String _adminPassword = String.fromEnvironment('ADMIN_PASSWORD', defaultValue: 'OdiaTraders@123');
 
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -123,7 +123,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                     ),
                     const SizedBox(height: 10),
                     const Text(
-                      'Default demo credentials: admin / Hindustan@123',
+                      'Default demo credentials: admin / OdiaTraders@123',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 12, color: Colors.black54),
                     ),

@@ -1,11 +1,11 @@
 {
-    "name": "hindustan_traders",
-    "short_name": "hindustan_traders",
+    "name": "OdiaTraders",
+    "short_name": "OdiaTraders",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#176B43",
+    "theme_color": "#176B43",
+    "description": "Wholesale grocery ordering, made simple.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

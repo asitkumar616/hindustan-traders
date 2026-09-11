@@ -1,4 +1,4 @@
--- Supabase schema for Hindustan Traders
+-- Supabase schema for OdiaTraders
 
 create table if not exists profiles (
   id uuid primary key default uuid_generate_v4(),
