@@ -163,6 +163,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       const Text('Powered by OdiaTraders', style: AppTextStyles.caption),
                     ],
                   ),
+                  const SizedBox(height: AppSpacing.xl),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                    child: Image.asset(
+                      'assets/images/illustrations/odisha_skyline.png',
+                      fit: BoxFit.cover,
+                      height: 120,
+                      width: double.infinity,
+                    ),
+                  ),
                 ],
               ),
             ),

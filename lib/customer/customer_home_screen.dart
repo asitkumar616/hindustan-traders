@@ -11,6 +11,7 @@ import '../src/theme/app_spacing.dart';
 import '../src/theme/app_text_styles.dart';
 import '../src/utils/category_visuals.dart';
 import '../src/utils/formatters.dart';
+import '../src/utils/product_images.dart';
 import '../src/widgets/app_card.dart';
 import '../src/widgets/app_empty_state.dart';
 import '../src/widgets/app_filter_chip.dart';
@@ -359,18 +360,29 @@ class _ProductCard extends StatelessWidget {
     // picking a different pack size means opening the product detail sheet.
     final defaultVariant = variants.isNotEmpty ? variants.first : null;
     final quantity = defaultVariant != null ? cart.quantityFor(defaultVariant.id) : 0.0;
-    final visual = categoryVisual(product['category']?.toString());
+    final category = product['category']?.toString();
+    final visual = categoryVisual(category);
+    final imageAsset = productImageAsset(productName: name, category: category);
 
     return AppCard(
       onTap: onTap,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(color: visual.color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(AppRadius.sm)),
-            child: Icon(visual.icon, color: visual.color, size: 28),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            child: Image.asset(
+              imageAsset,
+              width: 64,
+              height: 64,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(color: visual.color.withValues(alpha: 0.1)),
+                child: Icon(visual.icon, color: visual.color, size: 28),
+              ),
+            ),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(

@@ -5,6 +5,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
+import '../utils/product_images.dart';
 import '../widgets/app_card.dart';
 import '../widgets/app_empty_state.dart';
 import '../widgets/app_filter_chip.dart';
@@ -273,14 +274,20 @@ class _OwnerMasterCatalogScreenState extends State<OwnerMasterCatalogScreen> {
                               child: AppCard(
                                 child: Row(
                                   children: [
-                                    Container(
-                                      width: 48,
-                                      height: 48,
-                                      decoration: BoxDecoration(
-                                        color: AppColors.ownerPrimary.withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                                      child: Image.asset(
+                                        productImageAsset(productName: product.productName, category: product.category),
+                                        width: 48,
+                                        height: 48,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) => Container(
+                                          width: 48,
+                                          height: 48,
+                                          color: AppColors.ownerPrimary.withValues(alpha: 0.1),
+                                          child: const Icon(Icons.inventory_2_outlined, color: AppColors.ownerPrimary),
+                                        ),
                                       ),
-                                      child: const Icon(Icons.inventory_2_outlined, color: AppColors.ownerPrimary),
                                     ),
                                     const SizedBox(width: AppSpacing.md),
                                     Expanded(

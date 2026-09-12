@@ -11,6 +11,7 @@ import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
 import '../utils/formatters.dart';
+import '../utils/product_images.dart';
 import '../widgets/app_card.dart';
 import '../widgets/app_empty_state.dart';
 import '../widgets/app_loading_state.dart';
@@ -531,23 +532,31 @@ class _OwnerProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final name = product['name']?.toString() ?? 'Product';
     final brand = product['brand']?.toString();
+    final category = product['category']?.toString();
     final variants = (product['variants'] as List<dynamic>? ?? const <dynamic>[])
         .whereType<Map<String, dynamic>>()
         .map(ProductVariant.fromMap)
         .toList();
+    final imageAsset = productImageAsset(productName: name, category: category);
 
     return AppCard(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.ownerPrimary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(AppRadius.sm),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            child: Image.asset(
+              imageAsset,
+              width: 48,
+              height: 48,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(
+                width: 48,
+                height: 48,
+                color: AppColors.ownerPrimary.withValues(alpha: 0.1),
+                child: const Icon(Icons.inventory_2_outlined, color: AppColors.ownerPrimary),
+              ),
             ),
-            child: const Icon(Icons.inventory_2_outlined, color: AppColors.ownerPrimary),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(

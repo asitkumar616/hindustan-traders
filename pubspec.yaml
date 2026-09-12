@@ -37,3 +37,6 @@ flutter:
   assets:
     - .env
     - assets/translations/
+    - assets/images/branding/
+    - assets/images/illustrations/
+    - assets/images/products/
