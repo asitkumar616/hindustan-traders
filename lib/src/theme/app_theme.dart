@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 /// Central design system for the app: one seed-driven color scheme and a
 /// matching set of component themes, so every screen built from plain
@@ -24,17 +25,24 @@ class AppTheme {
     );
 
     final base = ThemeData(useMaterial3: true, colorScheme: colorScheme);
+    // Inter everywhere: applied once here, at the theme's textTheme, rather
+    // than on every individual TextStyle -- Text widgets without their own
+    // fontFamily (including the many const TextStyle literals in
+    // AppTextStyles and elsewhere) inherit it from the ambient
+    // DefaultTextStyle Flutter derives from this theme.
+    final interTextTheme = GoogleFonts.interTextTheme(base.textTheme);
 
     return base.copyWith(
       scaffoldBackgroundColor: colorScheme.surface,
-      textTheme: base.textTheme.copyWith(
-        titleLarge: base.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-        titleMedium: base.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-        titleSmall: base.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-        bodyLarge: base.textTheme.bodyLarge?.copyWith(height: 1.35),
-        bodyMedium: base.textTheme.bodyMedium?.copyWith(height: 1.35),
-        labelLarge: base.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+      textTheme: interTextTheme.copyWith(
+        titleLarge: interTextTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+        titleMedium: interTextTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+        titleSmall: interTextTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+        bodyLarge: interTextTheme.bodyLarge?.copyWith(height: 1.35),
+        bodyMedium: interTextTheme.bodyMedium?.copyWith(height: 1.35),
+        labelLarge: interTextTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
       ),
+      primaryTextTheme: GoogleFonts.interTextTheme(base.primaryTextTheme),
       appBarTheme: AppBarTheme(
         backgroundColor: colorScheme.primary,
         foregroundColor: colorScheme.onPrimary,
