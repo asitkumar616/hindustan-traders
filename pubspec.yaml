@@ -41,3 +41,17 @@ flutter:
     - assets/images/branding/
     - assets/images/illustrations/
     - assets/images/products/
+    - assets/images/products/beverages/
+    - assets/images/products/cooking_oils/
+    - assets/images/products/dairy_bakery/
+    - assets/images/products/dry_fruits_nuts/
+    - assets/images/products/flours_atta/
+    - assets/images/products/fruits/
+    - assets/images/products/miscellaneous/
+    - assets/images/products/packaged_foods/
+    - assets/images/products/pulses_lentils/
+    - assets/images/products/rice_grains/
+    - assets/images/products/snacks_namkeen/
+    - assets/images/products/spices/
+    - assets/images/products/sugar_salt/
+    - assets/images/products/vegetables/

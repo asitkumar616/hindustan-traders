@@ -247,8 +247,8 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
         ),
       ),
       bottomNavigationBar: AppVoiceBottomNav(
-        accentDark: AppColors.ownerPrimaryDark,
-        accentLight: AppColors.ownerPrimaryLight,
+        accentDark: AppColors.primaryDark,
+        accentLight: AppColors.primaryLight,
         leftItems: [
           AppNavItem(icon: Icons.home_rounded, label: 'Home', onTap: () => Navigator.maybePop(context)),
           AppNavItem(

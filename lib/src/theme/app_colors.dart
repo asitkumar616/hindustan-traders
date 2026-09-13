@@ -7,19 +7,20 @@ import 'package:flutter/material.dart';
 class AppColors {
   AppColors._();
 
-  // OdiaTraders brand palette (2026 mockup): saffron/orange drives every
-  // primary call-to-action button (Continue, Add to Cart, Place Order,
-  // Save...), navy is the structural color (headings, selected states, icon
-  // badges), used consistently across Customer/Owner/Admin -- unlike the
-  // earlier role-differentiated green/purple/blue scheme, this mockup uses
-  // ONE identity everywhere.
-  static const Color primary = Color(0xFFF5841F);
-  static const Color primaryLight = Color(0xFFFFA94D);
-  static const Color primaryDark = Color(0xFFD96E0F);
+  // OdiaTraders brand palette -- matches the logo mark exactly (#FF8A00
+  // orange, #2457C5 blue). Orange drives every primary call-to-action button
+  // (Continue, Add to Cart, Place Order, Save...); "navy" (the blue) is the
+  // structural color (headings, selected states, icon badges), used
+  // consistently across Customer/Owner/Admin -- unlike the earlier
+  // role-differentiated green/purple/blue scheme, this uses ONE identity
+  // everywhere.
+  static const Color primary = Color(0xFFFF8A00);
+  static const Color primaryLight = Color(0xFFFFAB4D);
+  static const Color primaryDark = Color(0xFFCC6E00);
 
-  static const Color navy = Color(0xFF17325C);
-  static const Color navyLight = Color(0xFF2C4E82);
-  static const Color navyDark = Color(0xFF0F2140);
+  static const Color navy = Color(0xFF2457C5);
+  static const Color navyLight = Color(0xFF4A78D6);
+  static const Color navyDark = Color(0xFF1B4499);
 
   static const Color accent = Color(0xFF17325C);
 
@@ -31,12 +32,12 @@ class AppColors {
   static const Color textPrimary = Color(0xFF1A1D1B);
   static const Color textSecondary = Color(0xFF6B7280);
   static const Color divider = Color(0xFFE5E7EB);
-  static const Color surfaceMuted = Color(0xFFF4F6F5);
+  static const Color surfaceMuted = Color(0xFFFFFFFF);
 
   // Category icon accents -- the mockup's category grid/badges use a mixed
   // palette (not one dominant color), so these are shared across whichever
   // screens render category chips/icons.
-  static const Color categoryRice = Color(0xFFF5841F);
+  static const Color categoryRice = primary;
   static const Color categoryDal = Color(0xFF7C6EF2);
   static const Color categoryOil = Color(0xFFE0A72E);
   static const Color categorySpice = Color(0xFFC62828);

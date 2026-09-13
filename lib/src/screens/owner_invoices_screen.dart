@@ -359,8 +359,8 @@ class _OwnerInvoicesScreenState extends State<OwnerInvoicesScreen> {
         ),
       ),
       bottomNavigationBar: AppVoiceBottomNav(
-        accentDark: AppColors.ownerPrimaryDark,
-        accentLight: AppColors.ownerPrimaryLight,
+        accentDark: AppColors.primaryDark,
+        accentLight: AppColors.primaryLight,
         leftItems: [
           AppNavItem(icon: Icons.home_rounded, label: 'Home', onTap: () => Navigator.maybePop(context)),
           AppNavItem(

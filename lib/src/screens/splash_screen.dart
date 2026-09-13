@@ -17,7 +17,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Timer(const Duration(milliseconds: 1800), () {
+    Timer(const Duration(milliseconds: 3000), () {
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
@@ -31,14 +31,9 @@ class _SplashScreenState extends State<SplashScreen> {
     final localized = AppLocalizations.of(context);
 
     return Scaffold(
+      backgroundColor: Colors.white,
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFFE6EFFB), Color(0xFFF7FAFD)],
-          ),
-        ),
+        color: Colors.white,
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),

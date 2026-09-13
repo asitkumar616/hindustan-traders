@@ -455,7 +455,7 @@ class _OwnerProductManagementScreenState extends State<OwnerProductManagementScr
                     child: ElevatedButton(
                       onPressed: _openAddProductByVoice,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.ownerPrimary,
+                        backgroundColor: AppColors.primary,
                         padding: EdgeInsets.zero,
                         shape: const CircleBorder(),
                       ),
@@ -469,8 +469,8 @@ class _OwnerProductManagementScreenState extends State<OwnerProductManagementScr
         ),
       ),
       bottomNavigationBar: AppVoiceBottomNav(
-        accentDark: AppColors.ownerPrimaryDark,
-        accentLight: AppColors.ownerPrimaryLight,
+        accentDark: AppColors.primaryDark,
+        accentLight: AppColors.primaryLight,
         leftItems: [
           AppNavItem(icon: Icons.home_rounded, label: 'Home', onTap: () => Navigator.maybePop(context)),
           const AppNavItem(icon: Icons.inventory_2_rounded, label: 'Products', active: true),

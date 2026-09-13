@@ -1,11 +1,12 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'local_storage_service.dart';
 import 'supabase_service.dart';
 
-const String _defineSupabaseUrl = String.fromEnvironment('SUPABASE_URL', defaultValue: '');
-const String _defineSupabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
+const String _defineSupabaseUrl =
+    String.fromEnvironment('SUPABASE_URL', defaultValue: '');
+const String _defineSupabaseAnonKey =
+    String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
 
 String _normalizeSupabaseUrl(String raw) {
   var value = raw.trim();
@@ -52,20 +53,27 @@ class AppState extends ChangeNotifier {
       // Flutter uses SUPABASE_URL / SUPABASE_ANON_KEY.
       // NEXT_PUBLIC_* is accepted as a compatibility fallback because the
       // repository previously contained a web/Next-style .env.
-      final rawSupabaseUrl = (dotenv.env['SUPABASE_URL']?.trim().isNotEmpty ?? false)
-          ? dotenv.env['SUPABASE_URL']!.trim()
-          : ((dotenv.env['NEXT_PUBLIC_SUPABASE_URL']?.trim().isNotEmpty ?? false)
-              ? dotenv.env['NEXT_PUBLIC_SUPABASE_URL']!.trim()
-              : _defineSupabaseUrl.trim());
+      final rawSupabaseUrl =
+          (dotenv.env['SUPABASE_URL']?.trim().isNotEmpty ?? false)
+              ? dotenv.env['SUPABASE_URL']!.trim()
+              : ((dotenv.env['NEXT_PUBLIC_SUPABASE_URL']?.trim().isNotEmpty ??
+                      false)
+                  ? dotenv.env['NEXT_PUBLIC_SUPABASE_URL']!.trim()
+                  : _defineSupabaseUrl.trim());
 
       final supabaseUrl = _normalizeSupabaseUrl(rawSupabaseUrl);
 
-      final supabaseAnonKey = (dotenv.env['SUPABASE_ANON_KEY']?.trim().isNotEmpty ?? false)
-          ? dotenv.env['SUPABASE_ANON_KEY']!.trim()
-          : ((dotenv.env['NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY']?.trim().isNotEmpty ?? false)
-              ? dotenv.env['NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY']!.trim()
-              : _defineSupabaseAnonKey.trim());
-      _backendConfigured = rawSupabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
+      final supabaseAnonKey =
+          (dotenv.env['SUPABASE_ANON_KEY']?.trim().isNotEmpty ?? false)
+              ? dotenv.env['SUPABASE_ANON_KEY']!.trim()
+              : ((dotenv.env['NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY']
+                          ?.trim()
+                          .isNotEmpty ??
+                      false)
+                  ? dotenv.env['NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY']!.trim()
+                  : _defineSupabaseAnonKey.trim());
+      _backendConfigured =
+          rawSupabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
       if (!_backendConfigured) {
         _backendReady = false;
         _backendStatus =
@@ -75,7 +83,8 @@ class AppState extends ChangeNotifier {
         _backendStatus =
             'Invalid SUPABASE_URL. Use project-ref.supabase.co or https://project-ref.supabase.co, then rebuild APK.';
       } else if (!SupabaseService.isInitialized) {
-        await SupabaseService.init(url: supabaseUrl, anonKey: supabaseAnonKey).timeout(const Duration(seconds: 8));
+        await SupabaseService.init(url: supabaseUrl, anonKey: supabaseAnonKey)
+            .timeout(const Duration(seconds: 8));
         _backendReady = SupabaseService.isInitialized;
         _backendStatus = _backendReady
             ? 'Backend connected.'
@@ -87,7 +96,8 @@ class AppState extends ChangeNotifier {
     } catch (_) {
       // App should still boot even if backend init fails or times out.
       _backendReady = false;
-      _backendStatus = 'Unable to connect backend. Check internet connection and Supabase settings.';
+      _backendStatus =
+          'Unable to connect backend. Check internet connection and Supabase settings.';
     }
 
     try {

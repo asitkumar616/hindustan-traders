@@ -305,8 +305,8 @@ class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
         ),
       ),
       bottomNavigationBar: AppVoiceBottomNav(
-        accentDark: AppColors.ownerPrimaryDark,
-        accentLight: AppColors.ownerPrimaryLight,
+        accentDark: AppColors.primaryDark,
+        accentLight: AppColors.primaryLight,
         leftItems: [
           const AppNavItem(icon: Icons.home_rounded, label: 'Home', active: true),
           AppNavItem(

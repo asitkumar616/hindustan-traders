@@ -8,20 +8,31 @@ import 'package:google_fonts/google_fonts.dart';
 class AppTheme {
   AppTheme._();
 
-  static const Color _seed = Color(0xFFF5841F);
-  static const Color _accent = Color(0xFF17325C);
+  static const Color _seed = Color(0xFFFF8A00);
+  static const Color _accent = Color(0xFF2457C5);
 
   static const double radiusSmall = 10;
   static const double radiusMedium = 14;
   static const double radiusLarge = 20;
 
   static ThemeData get light {
+    // ColorScheme.fromSeed() does NOT use the seed color as-is for
+    // `primary` -- it derives an algorithmically-toned variant (for
+    // contrast/accessibility) that can drift noticeably from the literal
+    // brand hex (e.g. our #FF8A00 seed was rendering as a muted brown on
+    // buttons). Overriding primary/secondary explicitly here guarantees
+    // every ElevatedButton/AppBar/FAB that reads colorScheme.primary shows
+    // the exact logo color, not Material's computed approximation.
     final colorScheme = ColorScheme.fromSeed(
       seedColor: _seed,
       brightness: Brightness.light,
     ).copyWith(
+      primary: _seed,
+      onPrimary: Colors.white,
       secondary: _accent,
       onSecondary: Colors.white,
+      surface: Colors.white,
+      surfaceTint: Colors.transparent,
     );
 
     final base = ThemeData(useMaterial3: true, colorScheme: colorScheme);
@@ -121,8 +132,8 @@ class AppTheme {
         ),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor: colorScheme.secondary,
-        foregroundColor: colorScheme.onSecondary,
+        backgroundColor: colorScheme.primary,
+        foregroundColor: colorScheme.onPrimary,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radiusMedium)),
       ),
       dialogTheme: DialogThemeData(
