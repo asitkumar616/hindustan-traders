@@ -368,18 +368,25 @@ class _ProductCard extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(AppRadius.sm),
-            child: Image.asset(
-              imageAsset,
-              width: 88,
-              height: 88,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Container(
-                width: 88,
-                height: 88,
-                decoration: BoxDecoration(color: visual.color.withValues(alpha: 0.1)),
-                child: Icon(visual.icon, color: visual.color, size: 36),
-              ),
-            ),
+            child: imageAsset == null
+                ? Container(
+                    width: 88,
+                    height: 88,
+                    decoration: BoxDecoration(color: visual.color.withValues(alpha: 0.1)),
+                    child: Icon(visual.icon, color: visual.color, size: 36),
+                  )
+                : Image.asset(
+                    imageAsset,
+                    width: 88,
+                    height: 88,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      width: 88,
+                      height: 88,
+                      decoration: BoxDecoration(color: visual.color.withValues(alpha: 0.1)),
+                      child: Icon(visual.icon, color: visual.color, size: 36),
+                    ),
+                  ),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(

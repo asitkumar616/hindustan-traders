@@ -545,18 +545,25 @@ class _OwnerProductCard extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(AppRadius.sm),
-            child: Image.asset(
-              imageAsset,
-              width: 72,
-              height: 72,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Container(
-                width: 72,
-                height: 72,
-                color: AppColors.ownerPrimary.withValues(alpha: 0.1),
-                child: const Icon(Icons.inventory_2_outlined, color: AppColors.ownerPrimary),
-              ),
-            ),
+            child: imageAsset == null
+                ? Container(
+                    width: 72,
+                    height: 72,
+                    color: AppColors.ownerPrimary.withValues(alpha: 0.1),
+                    child: const Icon(Icons.inventory_2_outlined, color: AppColors.ownerPrimary),
+                  )
+                : Image.asset(
+                    imageAsset,
+                    width: 72,
+                    height: 72,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      width: 72,
+                      height: 72,
+                      color: AppColors.ownerPrimary.withValues(alpha: 0.1),
+                      child: const Icon(Icons.inventory_2_outlined, color: AppColors.ownerPrimary),
+                    ),
+                  ),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(

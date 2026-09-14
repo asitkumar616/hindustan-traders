@@ -269,6 +269,10 @@ class _OwnerMasterCatalogScreenState extends State<OwnerMasterCatalogScreen> {
                           itemCount: _products.length,
                           itemBuilder: (context, index) {
                             final product = _products[index];
+                            final imageAsset = productImageAsset(
+                              productName: product.productName,
+                              category: product.category,
+                            );
                             return Padding(
                               padding: const EdgeInsets.only(bottom: AppSpacing.md),
                               child: AppCard(
@@ -276,18 +280,25 @@ class _OwnerMasterCatalogScreenState extends State<OwnerMasterCatalogScreen> {
                                   children: [
                                     ClipRRect(
                                       borderRadius: BorderRadius.circular(AppRadius.sm),
-                                      child: Image.asset(
-                                        productImageAsset(productName: product.productName, category: product.category),
-                                        width: 72,
-                                        height: 72,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) => Container(
-                                          width: 72,
-                                          height: 72,
-                                          color: AppColors.ownerPrimary.withValues(alpha: 0.1),
-                                          child: const Icon(Icons.inventory_2_outlined, color: AppColors.ownerPrimary),
-                                        ),
-                                      ),
+                                      child: imageAsset == null
+                                          ? Container(
+                                              width: 72,
+                                              height: 72,
+                                              color: AppColors.ownerPrimary.withValues(alpha: 0.1),
+                                              child: const Icon(Icons.inventory_2_outlined, color: AppColors.ownerPrimary),
+                                            )
+                                          : Image.asset(
+                                              imageAsset,
+                                              width: 72,
+                                              height: 72,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (context, error, stackTrace) => Container(
+                                                width: 72,
+                                                height: 72,
+                                                color: AppColors.ownerPrimary.withValues(alpha: 0.1),
+                                                child: const Icon(Icons.inventory_2_outlined, color: AppColors.ownerPrimary),
+                                              ),
+                                            ),
                                     ),
                                     const SizedBox(width: AppSpacing.md),
                                     Expanded(

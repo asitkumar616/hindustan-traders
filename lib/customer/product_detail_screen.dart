@@ -84,18 +84,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       final imageAsset = productImageAsset(productName: name, category: category);
                       return ClipRRect(
                         borderRadius: BorderRadius.circular(AppRadius.lg),
-                        child: Image.asset(
-                          imageAsset,
-                          width: double.infinity,
-                          height: 220,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Container(
-                            width: double.infinity,
-                            height: 220,
-                            color: visual.color.withValues(alpha: 0.08),
-                            child: Icon(visual.icon, color: visual.color, size: 72),
-                          ),
-                        ),
+                        child: imageAsset == null
+                            ? Container(
+                                width: double.infinity,
+                                height: 220,
+                                color: visual.color.withValues(alpha: 0.08),
+                                child: Icon(visual.icon, color: visual.color, size: 72),
+                              )
+                            : Image.asset(
+                                imageAsset,
+                                width: double.infinity,
+                                height: 220,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) => Container(
+                                  width: double.infinity,
+                                  height: 220,
+                                  color: visual.color.withValues(alpha: 0.08),
+                                  child: Icon(visual.icon, color: visual.color, size: 72),
+                                ),
+                              ),
                       );
                     }),
                     const SizedBox(height: AppSpacing.xl),

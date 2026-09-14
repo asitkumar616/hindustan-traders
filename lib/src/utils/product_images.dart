@@ -2,18 +2,14 @@
 /// -- tries an exact product-name match first (covers every item that has
 /// a dedicated photo, whether from the seeded master catalog or a custom
 /// product an owner typed with a matching name), then falls back to a
-/// category-level photo, then to the generic placeholder. Always returns a
-/// usable asset path since default_product.webp exists for every
-/// unmatched case.
-String productImageAsset({required String productName, String? category}) {
+/// category-level photo. Returns null when there's no match so callers can
+/// show the icon-based placeholder instead of a real image.
+String? productImageAsset({required String productName, String? category}) {
   final normalizedName = productName.trim().toLowerCase();
   final exact = _productNameToAsset[normalizedName];
   if (exact != null) return exact;
 
-  final categoryAsset = _categoryToAsset[category];
-  if (categoryAsset != null) return categoryAsset;
-
-  return 'assets/images/products/default_product.webp';
+  return _categoryToAsset[category];
 }
 
 const String _p = 'assets/images/products';
