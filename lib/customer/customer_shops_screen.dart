@@ -32,6 +32,7 @@ class _CustomerShopsScreenState extends State<CustomerShopsScreen> {
   String? _customerName;
   List<CustomerBusiness> _businesses = const <CustomerBusiness>[];
   List<Map<String, dynamic>> _recentOrders = const <Map<String, dynamic>>[];
+  CustomerDashboardSummary _summary = CustomerDashboardSummary.empty;
   bool _loading = true;
   String? _loadError;
 
@@ -51,11 +52,13 @@ class _CustomerShopsScreenState extends State<CustomerShopsScreen> {
       final profile = await AuthService.getCurrentProfile();
       final businesses = await CustomerDashboardService.fetchMyBusinesses();
       final recentOrders = await OrderService.getRecentOrdersForCustomer(limit: 3);
+      final summary = await CustomerDashboardService.fetchSummary();
       if (!mounted) return;
       setState(() {
         _customerName = profile?.name;
         _businesses = businesses;
         _recentOrders = recentOrders;
+        _summary = summary;
       });
     } catch (error) {
       if (!mounted) return;
@@ -194,6 +197,10 @@ class _CustomerShopsScreenState extends State<CustomerShopsScreen> {
                   onRetry: _load,
                 ),
               ],
+              if (!_loading && _businesses.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.lg),
+                _CustomerStatRow(summary: _summary),
+              ],
               const SizedBox(height: AppSpacing.lg),
               _SpeakOrderButton(onTap: _startVoiceOrder),
               const SizedBox(height: AppSpacing.xl),
@@ -247,6 +254,87 @@ class _CustomerShopsScreenState extends State<CustomerShopsScreen> {
           AppNavItem(icon: Icons.person_outline_rounded, label: 'Profile', onTap: _openProfile),
         ],
         onVoice: _startVoiceOrder,
+      ),
+    );
+  }
+}
+
+/// Today's Transaction / Total Billing / Total Balance -- the same "at a
+/// glance" pattern as the Owner dashboard's stat grid, scaled down to 3
+/// compact cards since the customer view has less room. Fetched via
+/// customer_dashboard_summary(), which degrades to zeros (not an error) if
+/// that RPC isn't deployed yet, so this row never blocks the rest of the
+/// screen from loading.
+class _CustomerStatRow extends StatelessWidget {
+  const _CustomerStatRow({required this.summary});
+
+  final CustomerDashboardSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _StatChip(
+            icon: Icons.today_rounded,
+            label: "Today's Transaction",
+            value: '₹${formatIndianAmount(summary.todaySpent)}',
+            color: AppColors.primary,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: _StatChip(
+            icon: Icons.receipt_long_rounded,
+            label: 'Total Billing',
+            value: '₹${formatIndianAmount(summary.totalSpent)}',
+            color: AppColors.navy,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: _StatChip(
+            icon: Icons.account_balance_wallet_outlined,
+            label: 'Total Balance',
+            value: '₹${formatIndianAmount(summary.totalBalance)}',
+            color: AppColors.warning,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatChip extends StatelessWidget {
+  const _StatChip({required this.icon, required this.label, required this.value, required this.color});
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          Text(label, style: AppTextStyles.caption, overflow: TextOverflow.ellipsis, maxLines: 1),
+        ],
       ),
     );
   }
