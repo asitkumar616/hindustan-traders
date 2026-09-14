@@ -278,12 +278,12 @@ class _OwnerMasterCatalogScreenState extends State<OwnerMasterCatalogScreen> {
                                       borderRadius: BorderRadius.circular(AppRadius.sm),
                                       child: Image.asset(
                                         productImageAsset(productName: product.productName, category: product.category),
-                                        width: 48,
-                                        height: 48,
+                                        width: 72,
+                                        height: 72,
                                         fit: BoxFit.cover,
                                         errorBuilder: (context, error, stackTrace) => Container(
-                                          width: 48,
-                                          height: 48,
+                                          width: 72,
+                                          height: 72,
                                           color: AppColors.ownerPrimary.withValues(alpha: 0.1),
                                           child: const Icon(Icons.inventory_2_outlined, color: AppColors.ownerPrimary),
                                         ),

@@ -20,7 +20,7 @@ void main() {
 
   group('OrderDraftService.estimateTotalAmount', () {
     test('sums the expected amount from detected items', () {
-      final draft = const OrderDraft(transcript: 'rice milk', items: ['Rice - 2 kg', 'Milk - 1 litre']);
+      const draft = OrderDraft(transcript: 'rice milk', items: ['Rice - 2 kg', 'Milk - 1 litre']);
 
       expect(OrderDraftService.estimateTotalAmount(draft.items), 140);
     });

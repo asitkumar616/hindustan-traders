@@ -95,7 +95,7 @@ class _OwnerOrdersCardState extends State<OwnerOrdersCard> {
               const SizedBox(height: 8),
               Text('${localized.translate('owner_order_detail_status')}: ${status.toUpperCase()}'),
               const SizedBox(height: 12),
-              Text('Items:'),
+              const Text('Items:'),
               const SizedBox(height: 4),
               if (items.isEmpty)
                 const Text('No item breakdown available yet.')

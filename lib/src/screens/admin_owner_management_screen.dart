@@ -167,7 +167,7 @@ class _AdminOwnerManagementScreenState extends State<AdminOwnerManagementScreen>
                     ),
                     const SizedBox(height: 10),
                     DropdownButtonFormField<String>(
-                      value: status,
+                      initialValue: status,
                       items: const [
                         DropdownMenuItem(value: 'pending', child: Text('Pending')),
                         DropdownMenuItem(value: 'approved', child: Text('Approved')),

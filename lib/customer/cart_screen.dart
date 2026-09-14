@@ -11,6 +11,7 @@ import '../src/widgets/app_card.dart';
 import '../src/widgets/app_empty_state.dart';
 import '../src/widgets/app_primary_button.dart';
 import '../src/widgets/app_quantity_stepper.dart';
+import 'payment_method_screen.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -28,11 +29,24 @@ class _CartScreenState extends State<CartScreen> {
     if (!mounted) return;
     setState(() => _placingOrder = false);
 
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result.message)));
-    if (result.success) {
+    if (result.success && result.orderId != null) {
+      final businessName = cart.businessName;
+      final totalAmount = result.totalAmount ?? cart.subtotal;
       cart.clear();
-      Navigator.pop(context);
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PaymentMethodScreen(
+            orderId: result.orderId!,
+            businessName: businessName,
+            totalAmount: totalAmount,
+          ),
+        ),
+      );
+      return;
     }
+
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result.message)));
   }
 
   @override

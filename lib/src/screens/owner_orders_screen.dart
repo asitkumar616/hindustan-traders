@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import '../models/order_payment.dart';
 import '../services/auth_service.dart';
 import '../services/order_service.dart';
+import '../services/payment_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
@@ -81,6 +83,41 @@ class _OwnerOrdersScreenState extends State<OwnerOrdersScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Unable to update order: $error')),
+      );
+    }
+  }
+
+  Future<void> _confirmMarkPaid(Map<String, dynamic> order) async {
+    final amount = (order['total_amount'] as num?) ?? 0;
+    final customer = (order['customer'] as Map<String, dynamic>?) ?? <String, dynamic>{};
+    final customerName = (customer['name'] as String?)?.isNotEmpty == true ? customer['name'] as String : 'this customer';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Confirm Payment'),
+        content: Text('Have you received ₹${formatIndianAmount(amount)} from $customerName?\n\nPayment Method: Cash on Delivery'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Confirm Payment'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await PaymentService.confirmCodPayment(order['id'] as String);
+      if (!mounted) return;
+      Navigator.pop(context);
+      await _loadOrders();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to confirm payment: $error')),
       );
     }
   }
@@ -173,6 +210,25 @@ class _OwnerOrdersScreenState extends State<OwnerOrdersScreen> {
                     ),
                   ],
                 ),
+                const SizedBox(height: AppSpacing.sm),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Payment', style: AppTextStyles.bodyMuted),
+                    Text(OrderService.paymentLabel(order), style: const TextStyle(fontWeight: FontWeight.w700)),
+                  ],
+                ),
+                if (order['payment_method'] == OrderPaymentMethod.cashOnDelivery &&
+                    order['payment_status'] != OrderPaymentStatus.paid) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () => _confirmMarkPaid(order),
+                      child: const Text('Mark as Paid'),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: AppSpacing.lg),
                 if (status == 'pending')
                   Row(
@@ -413,6 +469,17 @@ class _OwnerOrderCard extends StatelessWidget {
               ),
             ],
           ),
+          if (order['payment_method'] != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              OrderService.paymentLabel(order),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: order['payment_status'] == OrderPaymentStatus.paid ? AppColors.success : AppColors.warning,
+              ),
+            ),
+          ],
         ],
       ),
     );

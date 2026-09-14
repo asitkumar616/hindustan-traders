@@ -14,11 +14,15 @@ class OrderSubmissionResult {
   final bool success;
   final bool savedLocally;
   final String message;
+  final String? orderId;
+  final double? totalAmount;
 
   const OrderSubmissionResult({
     required this.success,
     this.savedLocally = false,
     this.message = '',
+    this.orderId,
+    this.totalAmount,
   });
 }
 
@@ -271,7 +275,12 @@ class OrderDraftService {
         totalAmount: totalAmount,
       );
 
-      return const OrderSubmissionResult(success: true, message: 'Order placed successfully.');
+      return OrderSubmissionResult(
+        success: true,
+        message: 'Order placed successfully.',
+        orderId: orderId,
+        totalAmount: totalAmount,
+      );
     } catch (_) {
       return const OrderSubmissionResult(success: false, message: 'Unable to place your order. Please try again.');
     }

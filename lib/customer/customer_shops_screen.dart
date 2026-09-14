@@ -15,6 +15,7 @@ import '../src/widgets/app_loading_state.dart';
 import '../src/widgets/app_secondary_button.dart';
 import '../src/widgets/app_section_header.dart';
 import '../src/widgets/app_voice_bottom_nav.dart';
+import '../src/widgets/notification_bell.dart';
 import '../src/widgets/voice_order_card.dart';
 import 'customer_home_screen.dart';
 import 'customer_orders_screen.dart';
@@ -148,12 +149,12 @@ class _CustomerShopsScreenState extends State<CustomerShopsScreen> {
     );
   }
 
-  void _showNotifications() {
+  Future<void> _showNotifications() {
     if (_businesses.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No notifications yet.')));
-      return;
+      return Future.value();
     }
-    showModalBottomSheet<void>(
+    return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
@@ -178,10 +179,9 @@ class _CustomerShopsScreenState extends State<CustomerShopsScreen> {
             children: [
               Align(
                 alignment: Alignment.centerRight,
-                child: IconButton(
-                  onPressed: _showNotifications,
-                  icon: const Icon(Icons.notifications_none_rounded),
-                  color: AppColors.textPrimary,
+                child: NotificationBell(
+                  businessIds: _businesses.map((b) => b.businessId).toList(),
+                  onTap: _showNotifications,
                 ),
               ),
               Text('Hello, $greetingName \u{1F44B}', style: AppTextStyles.heading),

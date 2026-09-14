@@ -12,12 +12,12 @@ void main() {
   });
 
   test('updates the matching draft when the owner changes its status', () async {
-    final first = const OrderDraft(
+    const first = OrderDraft(
       transcript: 'rice',
       items: ['Rice - 2 kg'],
       status: OrderStatus.incoming,
     );
-    final second = const OrderDraft(
+    const second = OrderDraft(
       transcript: 'milk',
       items: ['Milk - 1 litre'],
       status: OrderStatus.incoming,

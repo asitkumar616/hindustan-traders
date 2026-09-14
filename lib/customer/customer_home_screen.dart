@@ -19,6 +19,7 @@ import '../src/widgets/app_loading_state.dart';
 import '../src/widgets/app_quantity_stepper.dart';
 import '../src/widgets/app_voice_bottom_nav.dart';
 import '../src/widgets/draft_history_card.dart';
+import '../src/widgets/notification_bell.dart';
 import '../src/widgets/notifications_card.dart';
 import '../src/widgets/voice_order_card.dart';
 import 'cart_screen.dart';
@@ -136,8 +137,8 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerProfileScreen()));
   }
 
-  void _showNotifications() {
-    showModalBottomSheet<void>(
+  Future<void> _showNotifications() {
+    return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
@@ -206,11 +207,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                           ],
                         ),
                       ),
-                      IconButton(
-                        onPressed: _showNotifications,
-                        icon: const Icon(Icons.notifications_none_rounded),
-                        color: AppColors.textPrimary,
-                      ),
+                      NotificationBell(businessIds: [widget.businessId], onTap: _showNotifications),
                       IconButton(
                         onPressed: _logout,
                         icon: const Icon(Icons.logout),
@@ -373,14 +370,14 @@ class _ProductCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppRadius.sm),
             child: Image.asset(
               imageAsset,
-              width: 64,
-              height: 64,
+              width: 88,
+              height: 88,
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) => Container(
-                width: 64,
-                height: 64,
+                width: 88,
+                height: 88,
                 decoration: BoxDecoration(color: visual.color.withValues(alpha: 0.1)),
-                child: Icon(visual.icon, color: visual.color, size: 28),
+                child: Icon(visual.icon, color: visual.color, size: 36),
               ),
             ),
           ),

@@ -29,7 +29,7 @@ class OrderService {
 
     final response = await client
         .from('orders')
-        .select('id, business_id, status, total_amount, created_at')
+        .select('id, business_id, status, total_amount, created_at, payment_method, payment_status, paid_at')
         .eq('customer_id', userId)
         .order('created_at', ascending: false)
         .limit(limit);
@@ -47,7 +47,7 @@ class OrderService {
 
     final response = await client
         .from('orders')
-        .select('id, business_id, status, total_amount, created_at, order_items(id)')
+        .select('id, business_id, status, total_amount, created_at, payment_method, payment_status, paid_at, order_items(id)')
         .eq('customer_id', userId)
         .order('created_at', ascending: false);
 
@@ -87,6 +87,9 @@ class OrderService {
           status,
           total_amount,
           created_at,
+          payment_method,
+          payment_status,
+          paid_at,
           customer:profiles!orders_customer_id_fkey(name, phone),
           order_items (
             id,
@@ -169,6 +172,18 @@ class OrderService {
 
     final unit = item['unit']?.toString() ?? '';
     return '$orderedQty $unit';
+  }
+
+  /// "UPI • PAID" / "Cash on Delivery • PENDING" style label for an order's
+  /// payment_method + payment_status. Falls back to "Payment Pending" for
+  /// orders placed before the payment MVP columns existed (payment_method
+  /// null).
+  static String paymentLabel(Map<String, dynamic> order) {
+    final method = order['payment_method']?.toString();
+    final status = (order['payment_status']?.toString() ?? 'pending').toUpperCase();
+    if (method == null || method.isEmpty) return 'Payment Pending';
+    final methodLabel = method == 'upi' ? 'UPI' : 'Cash on Delivery';
+    return '$methodLabel • $status';
   }
 
   static String formatDisplayDate(String? timestamp) {

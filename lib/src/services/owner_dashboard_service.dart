@@ -7,6 +7,7 @@ class OwnerDashboardSummary {
   final int todayOrders;
   final double todayRevenue;
   final double pendingAmount;
+  final double pendingCod;
 
   const OwnerDashboardSummary({
     required this.businessId,
@@ -15,6 +16,7 @@ class OwnerDashboardSummary {
     required this.todayOrders,
     required this.todayRevenue,
     required this.pendingAmount,
+    this.pendingCod = 0,
   });
 
   static const empty = OwnerDashboardSummary(
@@ -24,6 +26,7 @@ class OwnerDashboardSummary {
     todayOrders: 0,
     todayRevenue: 0,
     pendingAmount: 0,
+    pendingCod: 0,
   );
 }
 
@@ -71,6 +74,7 @@ class OwnerDashboardService {
       todayOrders: _asInt(row['today_orders']),
       todayRevenue: _asDouble(row['today_revenue']),
       pendingAmount: _asDouble(row['pending_amount']),
+      pendingCod: _asDouble(row['pending_cod']),
     );
   }
 

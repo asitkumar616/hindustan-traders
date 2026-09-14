@@ -19,6 +19,7 @@ import '../src/widgets/app_loading_state.dart';
 import '../src/widgets/app_quick_action_tile.dart';
 import '../src/widgets/app_voice_bottom_nav.dart';
 import '../src/widgets/ask_assistant_sheet.dart';
+import '../src/widgets/notification_bell.dart';
 import '../src/widgets/notifications_card.dart';
 import '../src/widgets/owner_nav_drawer.dart';
 import '../src/widgets/voice_order_card.dart';
@@ -92,8 +93,8 @@ class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
     _scaffoldKey.currentState?.openDrawer();
   }
 
-  void _showNotifications() {
-    showModalBottomSheet<void>(
+  Future<void> _showNotifications() {
+    return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
@@ -145,11 +146,7 @@ class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
                     icon: const Icon(Icons.menu_rounded),
                     color: AppColors.textPrimary,
                   ),
-                  IconButton(
-                    onPressed: _showNotifications,
-                    icon: const Icon(Icons.notifications_none_rounded),
-                    color: AppColors.textPrimary,
-                  ),
+                  NotificationBell(businessIds: [businessId], onTap: _showNotifications),
                 ],
               ),
               Row(
@@ -202,12 +199,6 @@ class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
                 mainAxisSpacing: AppSpacing.md,
                 childAspectRatio: 1.5,
                 children: [
-                  AppQuickActionTile(
-                    icon: Icons.shopping_cart_outlined,
-                    label: 'Order',
-                    accentColor: AppColors.ownerPrimary,
-                    onTap: hasBusiness ? () => _showOrderChooser(businessId) : () {},
-                  ),
                   AppQuickActionTile(
                     icon: Icons.person_outline_rounded,
                     label: 'Customer',
@@ -342,60 +333,6 @@ class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
     );
   }
 
-  // "Order" quick action: normal UI is the primary path here (Browse
-  // Products), with Speak offered as one option rather than the whole
-  // experience. There's no owner-side order-builder screen yet, so both
-  // options route to the closest existing functionality for now.
-  void _showOrderChooser(String businessId) {
-    showModalBottomSheet<void>(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.xl),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Create Order', style: AppTextStyles.heading),
-              const SizedBox(height: AppSpacing.xs),
-              const Text('How would you like to add items?', style: AppTextStyles.bodyMuted),
-              const SizedBox(height: AppSpacing.lg),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(color: AppColors.ownerPrimary.withValues(alpha: 0.12), shape: BoxShape.circle),
-                  child: const Icon(Icons.mic_rounded, color: AppColors.ownerPrimary),
-                ),
-                title: const Text('Speak', style: TextStyle(fontWeight: FontWeight.w700)),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _showVoiceOrderSheet(businessId);
-                },
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(color: AppColors.ownerPrimary.withValues(alpha: 0.12), shape: BoxShape.circle),
-                  child: const Icon(Icons.inventory_2_outlined, color: AppColors.ownerPrimary),
-                ),
-                title: const Text('Browse Products', style: TextStyle(fontWeight: FontWeight.w700)),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _push(OwnerProductManagementScreen(businessId: businessId));
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   void _showAssistant(String businessId) {
     showModalBottomSheet<void>(
       context: context,
@@ -521,6 +458,14 @@ class _StatGrid extends StatelessWidget {
         bg: AppColors.statAmountBg,
         fg: AppColors.statAmountFg,
         onTap: onTapPendingAmount,
+      ),
+      _StatItem(
+        icon: Icons.local_shipping_outlined,
+        value: formatIndianAmount(summary.pendingCod),
+        label: 'Pending COD',
+        bg: AppColors.statPendingBg,
+        fg: AppColors.statPendingFg,
+        onTap: onTapPending,
       ),
     ];
 

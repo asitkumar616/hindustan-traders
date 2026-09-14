@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../src/models/order_payment.dart';
 import '../src/services/auth_service.dart';
 import '../src/services/customer_dashboard_service.dart';
 import '../src/services/order_service.dart';
@@ -14,9 +15,11 @@ import '../src/widgets/app_error_state.dart';
 import '../src/widgets/app_filter_chip.dart';
 import '../src/widgets/app_loading_state.dart';
 import '../src/widgets/app_primary_button.dart';
+import '../src/widgets/app_secondary_button.dart';
 import '../src/widgets/app_voice_bottom_nav.dart';
 import '../src/widgets/voice_order_card.dart';
 import 'customer_profile_screen.dart';
+import 'payment_method_screen.dart';
 
 class CustomerOrdersScreen extends StatefulWidget {
   const CustomerOrdersScreen({super.key});
@@ -266,10 +269,27 @@ class _OrderCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(color: statusStyle.bg, borderRadius: BorderRadius.circular(AppRadius.pill)),
-            child: Text(statusStyle.label, style: TextStyle(color: statusStyle.fg, fontSize: 11, fontWeight: FontWeight.w700)),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(color: statusStyle.bg, borderRadius: BorderRadius.circular(AppRadius.pill)),
+                child: Text(statusStyle.label, style: TextStyle(color: statusStyle.fg, fontSize: 11, fontWeight: FontWeight.w700)),
+              ),
+              if (order['payment_method'] != null) ...[
+                const SizedBox(width: AppSpacing.sm),
+                Text(
+                  OrderService.paymentLabel(order),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: order['payment_status'] == 'paid'
+                        ? AppColors.success
+                        : (order['payment_status'] == 'failed' ? AppColors.danger : AppColors.warning),
+                  ),
+                ),
+              ],
+            ],
           ),
         ],
       ),
@@ -372,6 +392,7 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
     final orderNumber = (widget.order['id']?.toString() ?? '').replaceAll('-', '');
     final shortNumber = orderNumber.length >= 6 ? orderNumber.substring(0, 6).toUpperCase() : orderNumber.toUpperCase();
     final amount = (widget.order['total_amount'] as num?) ?? 0;
+    final isFailedPayment = widget.order['payment_status'] == OrderPaymentStatus.failed;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -413,13 +434,47 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
             Text('₹${formatIndianAmount(amount)}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
           ],
         ),
-        const SizedBox(height: AppSpacing.lg),
-        AppPrimaryButton(
-          label: _printing ? 'Preparing...' : 'Print / Save Receipt',
-          icon: Icons.print_outlined,
-          onPressed: (_loading || _printing) ? null : _printReceipt,
-          loading: _printing,
+        const SizedBox(height: AppSpacing.sm),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Payment', style: AppTextStyles.bodyMuted),
+            Text(OrderService.paymentLabel(widget.order), style: const TextStyle(fontWeight: FontWeight.w700)),
+          ],
         ),
+        const SizedBox(height: AppSpacing.lg),
+        if (isFailedPayment) ...[
+          AppPrimaryButton(
+            label: 'Retry Payment',
+            icon: Icons.refresh_rounded,
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => PaymentMethodScreen(
+                    orderId: widget.order['id']?.toString() ?? '',
+                    businessName: widget.businessName,
+                    totalAmount: amount.toDouble(),
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: AppSpacing.md),
+          AppSecondaryButton(
+            label: _printing ? 'Preparing...' : 'Print / Save Receipt',
+            icon: Icons.print_outlined,
+            onPressed: (_loading || _printing) ? null : _printReceipt,
+            loading: _printing,
+          ),
+        ] else
+          AppPrimaryButton(
+            label: _printing ? 'Preparing...' : 'Print / Save Receipt',
+            icon: Icons.print_outlined,
+            onPressed: (_loading || _printing) ? null : _printReceipt,
+            loading: _printing,
+          ),
       ],
     );
   }

@@ -20,13 +20,15 @@ class CustomerBusinessService {
     return client;
   }
 
-  static Future<List<Map<String, dynamic>>> getCustomersForBusiness(String businessId) async {
+  static Future<List<Map<String, dynamic>>> getCustomersForBusiness(
+      String businessId) async {
     final client = _clientOrNull;
     if (client == null) return [];
 
     final response = await client
         .from('customers')
-        .select('id, business_id, profile_id, display_name, phone, is_active, status, shop_name, created_at')
+        .select(
+            'id, business_id, profile_id, display_name, phone, is_active, status, shop_name, created_at')
         .eq('business_id', businessId)
         .order('created_at', ascending: false);
 
@@ -42,11 +44,13 @@ class CustomerBusinessService {
     required double openingBalance,
     bool isActive = true,
   }) async {
-    final normalizedPhone = AuthService.normalizeIndianPhone(phone) ?? phone.trim();
+    final normalizedPhone =
+        AuthService.normalizeIndianPhone(phone) ?? phone.trim();
     final payload = {
       'business_id': businessId,
       'phone': normalizedPhone,
-      'display_name': customerName.trim().isEmpty ? shopName.trim() : customerName.trim(),
+      'display_name':
+          customerName.trim().isEmpty ? shopName.trim() : customerName.trim(),
       'customer_name': customerName.trim(),
       'shop_name': shopName.trim(),
       'address': address.trim(),
@@ -72,13 +76,15 @@ class CustomerBusinessService {
           .from('customers')
           .update(payload)
           .eq('id', existing['id'])
-          .select('id, business_id, profile_id, display_name, phone, status, shop_name, created_at')
+          .select(
+              'id, business_id, profile_id, display_name, phone, status, shop_name, created_at')
           .single();
     } else {
       record = await client
           .from('customers')
           .insert(payload)
-          .select('id, business_id, profile_id, display_name, phone, status, shop_name, created_at')
+          .select(
+              'id, business_id, profile_id, display_name, phone, status, shop_name, created_at')
           .single();
     }
 
@@ -99,13 +105,15 @@ class CustomerBusinessService {
     return record;
   }
 
-  static Future<Map<String, dynamic>?> getCustomerById(String customerId) async {
+  static Future<Map<String, dynamic>?> getCustomerById(
+      String customerId) async {
     final client = _clientOrNull;
     if (client == null) return null;
 
     return await client
         .from('customers')
-        .select('id, business_id, profile_id, display_name, customer_name, shop_name, phone, address, opening_balance, credit_limit, status, is_active, created_at')
+        .select(
+            'id, business_id, profile_id, display_name, customer_name, shop_name, phone, address, opening_balance, credit_limit, status, is_active, created_at')
         .eq('id', customerId)
         .maybeSingle();
   }
@@ -118,25 +126,31 @@ class CustomerBusinessService {
     final client = _clientOrNull;
     if (client == null) return;
 
-    final status = blocked ? 'BLOCKED' : (isRegistered ? 'ACTIVE' : 'NOT_REGISTERED');
-    await client.from('customers').update({'status': status}).eq('id', customerId);
+    final status =
+        blocked ? 'BLOCKED' : (isRegistered ? 'ACTIVE' : 'NOT_REGISTERED');
+    await client
+        .from('customers')
+        .update({'status': status}).eq('id', customerId);
   }
 
   static Future<Map<String, dynamic>?> findCustomerByPhone(String phone) async {
-    final normalizedPhone = AuthService.normalizeIndianPhone(phone) ?? phone.trim();
+    final normalizedPhone =
+        AuthService.normalizeIndianPhone(phone) ?? phone.trim();
     final client = _clientOrNull;
     if (client == null) return null;
 
     final response = await client
         .from('customers')
-        .select('id, business_id, profile_id, display_name, customer_name, shop_name, phone, status, created_at')
+        .select(
+            'id, business_id, profile_id, display_name, customer_name, shop_name, phone, status, created_at')
         .eq('phone', normalizedPhone)
         .maybeSingle();
 
     return response;
   }
 
-  static Future<List<Map<String, dynamic>>> getProductsForBusiness(String businessId) async {
+  static Future<List<Map<String, dynamic>>> getProductsForBusiness(
+      String businessId) async {
     final client = _clientOrNull;
     if (client == null) return [];
 
@@ -156,7 +170,8 @@ class CustomerBusinessService {
         .eq('is_active', true)
         .order('name', ascending: true);
 
-    return List<Map<String, dynamic>>.from((response as List).map((row) => normalizeProductRow(row as Map<String, dynamic>)));
+    return List<Map<String, dynamic>>.from((response as List)
+        .map((row) => normalizeProductRow(row as Map<String, dynamic>)));
   }
 
   static Map<String, dynamic> buildProductPayload({
@@ -203,7 +218,8 @@ class CustomerBusinessService {
 
     final createdProduct = await client
         .from('products')
-        .insert(buildProductPayload(businessId: businessId, name: trimmedName, unit: unit))
+        .insert(buildProductPayload(
+            businessId: businessId, name: trimmedName, unit: unit))
         .select('id, name, unit')
         .single();
 
@@ -256,7 +272,9 @@ class CustomerBusinessService {
           .maybeSingle();
 
       if (existingVariant != null) {
-        await client.from('product_variants').update({'selling_price': price}).eq('id', existingVariant['id']);
+        await client
+            .from('product_variants')
+            .update({'selling_price': price}).eq('id', existingVariant['id']);
       } else {
         await addVariant(
           productId: productId,
@@ -269,7 +287,8 @@ class CustomerBusinessService {
 
       await _notifyCustomersOfPriceChange(
         businessId: businessId,
-        productName: name?.trim().isNotEmpty == true ? name!.trim() : 'A product',
+        productName:
+            name?.trim().isNotEmpty == true ? name!.trim() : 'A product',
         newPrice: price,
         unit: unit,
       );
@@ -294,7 +313,8 @@ class CustomerBusinessService {
   // Master catalog
   // ----------------------------------------------------------------
 
-  static Future<List<MasterProduct>> getMasterProducts({String? category, String? query}) async {
+  static Future<List<MasterProduct>> getMasterProducts(
+      {String? category, String? query}) async {
     final client = _clientOrNull;
     if (client == null) return [];
 
@@ -307,7 +327,9 @@ class CustomerBusinessService {
     }
 
     final response = await builder.order('product_name', ascending: true);
-    return (response as List).map((row) => MasterProduct.fromMap(row as Map<String, dynamic>)).toList();
+    return (response as List)
+        .map((row) => MasterProduct.fromMap(row as Map<String, dynamic>))
+        .toList();
   }
 
   /// Links an owner's shop to a shared catalog entry -- creates the owner's
@@ -334,10 +356,14 @@ class CustomerBusinessService {
         .from('products')
         .insert(buildProductPayload(
           businessId: businessId,
-          name: customName?.trim().isNotEmpty == true ? customName!.trim() : masterProduct.productName,
+          name: customName?.trim().isNotEmpty == true
+              ? customName!.trim()
+              : masterProduct.productName,
           unit: masterProduct.baseUnit,
           category: masterProduct.category,
-          brand: brandOverride?.trim().isNotEmpty == true ? brandOverride!.trim() : masterProduct.brand,
+          brand: brandOverride?.trim().isNotEmpty == true
+              ? brandOverride!.trim()
+              : masterProduct.brand,
           imageUrl: masterProduct.imageUrl,
           masterProductId: masterProduct.id,
         ))
@@ -396,16 +422,20 @@ class CustomerBusinessService {
     final client = _clientOrNull;
     if (client == null) return null;
 
-    return await client.from('product_variants').insert({
-      'product_id': productId,
-      'quantity': quantity,
-      'unit': unit,
-      'package_type': packageType,
-      'selling_price': sellingPrice,
-      'minimum_order_quantity': minimumOrderQuantity,
-      'stock_quantity': stockQuantity,
-      'is_active': isActive,
-    }).select().single();
+    return await client
+        .from('product_variants')
+        .insert({
+          'product_id': productId,
+          'quantity': quantity,
+          'unit': unit,
+          'package_type': packageType,
+          'selling_price': sellingPrice,
+          'minimum_order_quantity': minimumOrderQuantity,
+          'stock_quantity': stockQuantity,
+          'is_active': isActive,
+        })
+        .select()
+        .single();
   }
 
   /// Updates a single variant's fields. If [notifyBusinessId] is given and
@@ -431,7 +461,8 @@ class CustomerBusinessService {
     if (unit != null) updates['unit'] = unit;
     if (packageType != null) updates['package_type'] = packageType;
     if (sellingPrice != null) updates['selling_price'] = sellingPrice;
-    if (minimumOrderQuantity != null) updates['minimum_order_quantity'] = minimumOrderQuantity;
+    if (minimumOrderQuantity != null)
+      updates['minimum_order_quantity'] = minimumOrderQuantity;
     if (stockQuantity != null) updates['stock_quantity'] = stockQuantity;
     if (isActive != null) updates['is_active'] = isActive;
 
@@ -452,7 +483,9 @@ class CustomerBusinessService {
   static Future<void> setVariantActive(String variantId, bool isActive) async {
     final client = _clientOrNull;
     if (client == null) return;
-    await client.from('product_variants').update({'is_active': isActive}).eq('id', variantId);
+    await client
+        .from('product_variants')
+        .update({'is_active': isActive}).eq('id', variantId);
   }
 
   static Future<void> deleteVariant(String variantId) async {
@@ -487,19 +520,24 @@ class CustomerBusinessService {
 
       if (recipientIds.isEmpty) return;
 
-      final unitLabel = unit?.trim().isNotEmpty == true ? '/${unit!.trim()}' : '';
+      final unitLabel =
+          unit?.trim().isNotEmpty == true ? '/${unit!.trim()}' : '';
 
       await client.from('notifications').insert(
-        recipientIds
-            .map((recipientId) => {
-                  'recipient_id': recipientId,
-                  'business_id': businessId,
-                  'title': 'Price updated',
-                  'body': '$productName is now ₹${newPrice.toStringAsFixed(0)}$unitLabel.',
-                  'data': {'product_name': productName, 'new_price': newPrice},
-                })
-            .toList(),
-      );
+            recipientIds
+                .map((recipientId) => {
+                      'recipient_id': recipientId,
+                      'business_id': businessId,
+                      'title': 'Price updated',
+                      'body':
+                          '$productName is now ₹${newPrice.toStringAsFixed(0)}$unitLabel.',
+                      'data': {
+                        'product_name': productName,
+                        'new_price': newPrice
+                      },
+                    })
+                .toList(),
+          );
     } catch (_) {
       // Non-fatal -- see comment above.
     }
@@ -509,7 +547,9 @@ class CustomerBusinessService {
     final client = _clientOrNull;
     if (client == null) return;
 
-    await client.from('products').update({'is_active': false}).eq('id', productId);
+    await client
+        .from('products')
+        .update({'is_active': false}).eq('id', productId);
   }
 
   static Future<Map<String, dynamic>?> createInvoiceDraft({
@@ -521,20 +561,24 @@ class CustomerBusinessService {
     final client = _clientOrNull;
     if (client == null) return null;
 
-    final response = await client.from('invoices').insert({
-      'business_id': businessId,
-      'customer_id': customerId,
-      'order_id': orderId,
-      'invoice_number': 'INV-${DateTime.now().millisecondsSinceEpoch}',
-      'status': 'draft',
-      'subtotal': totalAmount,
-      'discount': 0,
-      'total': totalAmount,
-      'paid_amount': 0,
-      'balance_amount': totalAmount,
-    }).select('id, invoice_number, total').single();
+    final response = await client
+        .from('invoices')
+        .insert({
+          'business_id': businessId,
+          'customer_id': customerId,
+          'order_id': orderId,
+          'invoice_number': 'INV-${DateTime.now().millisecondsSinceEpoch}',
+          'status': 'draft',
+          'subtotal': totalAmount,
+          'discount': 0,
+          'total': totalAmount,
+          'paid_amount': 0,
+          'balance_amount': totalAmount,
+        })
+        .select('id, invoice_number, total')
+        .single();
 
-    return response is Map<String, dynamic> ? response : null;
+    return response;
   }
 
   /// Shapes a `products` row (with its embedded `product_variants`) into the
@@ -544,11 +588,13 @@ class CustomerBusinessService {
   /// (cheapest active variant) so any code not yet updated for variants
   /// still has a sane single price to show instead of crashing.
   static Map<String, dynamic> normalizeProductRow(Map<String, dynamic> row) {
-    final variants = (row['product_variants'] as List<dynamic>? ?? const <dynamic>[])
+    final variants = (row['product_variants'] as List<dynamic>? ??
+            const <dynamic>[])
         .whereType<Map<String, dynamic>>()
         .where((variant) => variant['is_active'] != false)
         .toList()
-      ..sort((a, b) => ((a['selling_price'] as num?) ?? 0).compareTo((b['selling_price'] as num?) ?? 0));
+      ..sort((a, b) => ((a['selling_price'] as num?) ?? 0)
+          .compareTo((b['selling_price'] as num?) ?? 0));
 
     final cheapest = variants.isNotEmpty ? variants.first : null;
 
@@ -570,13 +616,15 @@ class CustomerBusinessService {
     required String userId,
     required String? displayName,
   }) async {
-    final normalizedPhone = AuthService.normalizeIndianPhone(phone) ?? phone.trim();
+    final normalizedPhone =
+        AuthService.normalizeIndianPhone(phone) ?? phone.trim();
     final client = _clientOrNull;
     if (client == null) return null;
 
     final customer = await client
         .from('customers')
-        .select('id, business_id, profile_id, display_name, customer_name, shop_name, phone, status')
+        .select(
+            'id, business_id, profile_id, display_name, customer_name, shop_name, phone, status')
         .eq('phone', normalizedPhone)
         .maybeSingle();
 
@@ -584,7 +632,12 @@ class CustomerBusinessService {
       return null;
     }
 
-    final resolvedName = (displayName ?? customer['customer_name'] ?? customer['display_name'] ?? 'Customer').toString().trim();
+    final resolvedName = (displayName ??
+            customer['customer_name'] ??
+            customer['display_name'] ??
+            'Customer')
+        .toString()
+        .trim();
     final businessId = customer['business_id'] as String?;
     if (businessId == null || businessId.isEmpty) {
       return null;
@@ -601,7 +654,8 @@ class CustomerBusinessService {
       'phone': normalizedPhone,
       'role': (existingProfile?['role'] as String?) ?? 'customer',
       'name': resolvedName,
-      'default_business_id': (existingProfile?['default_business_id'] as String?) ?? businessId,
+      'default_business_id':
+          (existingProfile?['default_business_id'] as String?) ?? businessId,
     };
 
     final profileRow = await client

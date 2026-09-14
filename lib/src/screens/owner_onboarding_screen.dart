@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/role_router.dart';
-import '../models/user_profile.dart';
 
 class OwnerOnboardingScreen extends StatefulWidget {
   const OwnerOnboardingScreen({super.key, required this.phone});
