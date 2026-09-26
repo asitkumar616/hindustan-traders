@@ -21,14 +21,16 @@ class CustomerBusinessService {
   }
 
   static Future<List<Map<String, dynamic>>> getCustomersForBusiness(
-      String businessId) async {
+    String businessId,
+  ) async {
     final client = _clientOrNull;
     if (client == null) return [];
 
     final response = await client
         .from('customers')
         .select(
-            'id, business_id, profile_id, display_name, phone, is_active, status, shop_name, created_at')
+          'id, business_id, profile_id, display_name, phone, is_active, status, shop_name, created_at',
+        )
         .eq('business_id', businessId)
         .order('created_at', ascending: false);
 
@@ -49,8 +51,9 @@ class CustomerBusinessService {
     final payload = {
       'business_id': businessId,
       'phone': normalizedPhone,
-      'display_name':
-          customerName.trim().isEmpty ? shopName.trim() : customerName.trim(),
+      'display_name': customerName.trim().isEmpty
+          ? shopName.trim()
+          : customerName.trim(),
       'customer_name': customerName.trim(),
       'shop_name': shopName.trim(),
       'address': address.trim(),
@@ -77,14 +80,16 @@ class CustomerBusinessService {
           .update(payload)
           .eq('id', existing['id'])
           .select(
-              'id, business_id, profile_id, display_name, phone, status, shop_name, created_at')
+            'id, business_id, profile_id, display_name, phone, status, shop_name, created_at',
+          )
           .single();
     } else {
       record = await client
           .from('customers')
           .insert(payload)
           .select(
-              'id, business_id, profile_id, display_name, phone, status, shop_name, created_at')
+            'id, business_id, profile_id, display_name, phone, status, shop_name, created_at',
+          )
           .single();
     }
 
@@ -93,27 +98,26 @@ class CustomerBusinessService {
     // business becomes associated with this one too, without creating a
     // duplicate customer person -- this is the same customer_businesses
     // relationship mvp_login_with_phone keeps in sync on every login.
-    await client.from('customer_businesses').upsert(
-      {
-        'customer_id': record['id'],
-        'business_id': businessId,
-        'status': 'ACTIVE',
-      },
-      onConflict: 'customer_id,business_id',
-    );
+    await client.from('customer_businesses').upsert({
+      'customer_id': record['id'],
+      'business_id': businessId,
+      'status': 'ACTIVE',
+    }, onConflict: 'customer_id,business_id');
 
     return record;
   }
 
   static Future<Map<String, dynamic>?> getCustomerById(
-      String customerId) async {
+    String customerId,
+  ) async {
     final client = _clientOrNull;
     if (client == null) return null;
 
     return await client
         .from('customers')
         .select(
-            'id, business_id, profile_id, display_name, customer_name, shop_name, phone, address, opening_balance, credit_limit, status, is_active, created_at')
+          'id, business_id, profile_id, display_name, customer_name, shop_name, phone, address, opening_balance, credit_limit, status, is_active, created_at',
+        )
         .eq('id', customerId)
         .maybeSingle();
   }
@@ -126,11 +130,13 @@ class CustomerBusinessService {
     final client = _clientOrNull;
     if (client == null) return;
 
-    final status =
-        blocked ? 'BLOCKED' : (isRegistered ? 'ACTIVE' : 'NOT_REGISTERED');
+    final status = blocked
+        ? 'BLOCKED'
+        : (isRegistered ? 'ACTIVE' : 'NOT_REGISTERED');
     await client
         .from('customers')
-        .update({'status': status}).eq('id', customerId);
+        .update({'status': status})
+        .eq('id', customerId);
   }
 
   static Future<Map<String, dynamic>?> findCustomerByPhone(String phone) async {
@@ -142,19 +148,28 @@ class CustomerBusinessService {
     final response = await client
         .from('customers')
         .select(
-            'id, business_id, profile_id, display_name, customer_name, shop_name, phone, status, created_at')
+          'id, business_id, profile_id, display_name, customer_name, shop_name, phone, status, created_at',
+        )
         .eq('phone', normalizedPhone)
         .maybeSingle();
 
     return response;
   }
 
+  /// [includeInactive] also returns deactivated products (with their
+  /// deactivated variants intact, keyed by their real variant id) -- used by
+  /// the owner's own product management screen so a deactivated product/
+  /// variant can be found and reactivated instead of becoming permanently
+  /// invisible. Customer-facing catalog browsing always uses the default
+  /// (active only), unchanged from before.
   static Future<List<Map<String, dynamic>>> getProductsForBusiness(
-      String businessId) async {
+    String businessId, {
+    bool includeInactive = false,
+  }) async {
     final client = _clientOrNull;
     if (client == null) return [];
 
-    final response = await client
+    final builder = client
         .from('products')
         .select('''
           id,
@@ -164,14 +179,87 @@ class CustomerBusinessService {
           brand,
           image_url,
           master_product_id,
+          is_active,
+          created_at,
+          description,
           product_variants(id, quantity, unit, package_type, selling_price, minimum_order_quantity, stock_quantity, is_active)
         ''')
-        .eq('business_id', businessId)
-        .eq('is_active', true)
-        .order('name', ascending: true);
+        .eq('business_id', businessId);
 
-    return List<Map<String, dynamic>>.from((response as List)
-        .map((row) => normalizeProductRow(row as Map<String, dynamic>)));
+    final response = await (includeInactive ? builder : builder.eq('is_active', true)).order('name', ascending: true);
+
+    return List<Map<String, dynamic>>.from(
+      (response as List).map(
+        (row) => normalizeProductRow(row as Map<String, dynamic>, includeInactiveVariants: includeInactive),
+      ),
+    );
+  }
+
+  /// Reverses [deleteProduct] -- brings a deactivated product back into the
+  /// owner's active catalog. Existing variants keep whatever active/inactive
+  /// state they already had; this only flips the product row itself.
+  static Future<void> setProductActive(String productId, bool isActive) async {
+    final client = _clientOrNull;
+    if (client == null) return;
+    await client.from('products').update({'is_active': isActive}).eq('id', productId);
+  }
+
+  /// Copies a product and its variants into a new product row for the same
+  /// business -- e.g. quickly creating a size/brand variant of something the
+  /// owner already sells. Never touches the original product, its variants,
+  /// or the shared master catalog entry it may be linked to.
+  static Future<Map<String, dynamic>?> duplicateProduct({
+    required String productId,
+    required String businessId,
+  }) async {
+    final client = _clientOrNull;
+    if (client == null) return null;
+
+    final original = await client
+        .from('products')
+        .select('name, unit, category, brand, image_url, master_product_id, description')
+        .eq('id', productId)
+        .single();
+
+    final variants = await client
+        .from('product_variants')
+        .select('quantity, unit, package_type, selling_price, minimum_order_quantity, stock_quantity, is_active')
+        .eq('product_id', productId);
+
+    final created = await client
+        .from('products')
+        .insert(
+          buildProductPayload(
+            businessId: businessId,
+            name: '${original['name']} (Copy)',
+            unit: original['unit']?.toString() ?? 'unit',
+            category: original['category']?.toString(),
+            brand: original['brand']?.toString(),
+            imageUrl: original['image_url']?.toString(),
+            masterProductId: original['master_product_id']?.toString(),
+            description: original['description']?.toString(),
+          ),
+        )
+        .select('id, name, unit, category, brand, image_url, master_product_id')
+        .single();
+
+    final newProductId = created['id'] as String?;
+    if (newProductId != null) {
+      for (final variant in List<Map<String, dynamic>>.from(variants as List)) {
+        await client.from('product_variants').insert({
+          'product_id': newProductId,
+          'quantity': variant['quantity'],
+          'unit': variant['unit'],
+          'package_type': variant['package_type'],
+          'selling_price': variant['selling_price'],
+          'minimum_order_quantity': variant['minimum_order_quantity'],
+          'stock_quantity': variant['stock_quantity'],
+          'is_active': variant['is_active'],
+        });
+      }
+    }
+
+    return created;
   }
 
   static Map<String, dynamic> buildProductPayload({
@@ -182,6 +270,7 @@ class CustomerBusinessService {
     String? brand,
     String? imageUrl,
     String? masterProductId,
+    String? description,
     bool isActive = true,
   }) {
     return {
@@ -192,6 +281,7 @@ class CustomerBusinessService {
       'brand': brand,
       'image_url': imageUrl,
       'master_product_id': masterProductId,
+      'description': description,
       'is_active': isActive,
     };
   }
@@ -218,8 +308,13 @@ class CustomerBusinessService {
 
     final createdProduct = await client
         .from('products')
-        .insert(buildProductPayload(
-            businessId: businessId, name: trimmedName, unit: unit))
+        .insert(
+          buildProductPayload(
+            businessId: businessId,
+            name: trimmedName,
+            unit: unit,
+          ),
+        )
         .select('id, name, unit')
         .single();
 
@@ -274,7 +369,8 @@ class CustomerBusinessService {
       if (existingVariant != null) {
         await client
             .from('product_variants')
-            .update({'selling_price': price}).eq('id', existingVariant['id']);
+            .update({'selling_price': price})
+            .eq('id', existingVariant['id']);
       } else {
         await addVariant(
           productId: productId,
@@ -287,8 +383,9 @@ class CustomerBusinessService {
 
       await _notifyCustomersOfPriceChange(
         businessId: businessId,
-        productName:
-            name?.trim().isNotEmpty == true ? name!.trim() : 'A product',
+        productName: name?.trim().isNotEmpty == true
+            ? name!.trim()
+            : 'A product',
         newPrice: price,
         unit: unit,
       );
@@ -313,8 +410,10 @@ class CustomerBusinessService {
   // Master catalog
   // ----------------------------------------------------------------
 
-  static Future<List<MasterProduct>> getMasterProducts(
-      {String? category, String? query}) async {
+  static Future<List<MasterProduct>> getMasterProducts({
+    String? category,
+    String? query,
+  }) async {
     final client = _clientOrNull;
     if (client == null) return [];
 
@@ -343,6 +442,32 @@ class CustomerBusinessService {
   /// is deliberately allowed to repeat: nothing here checks for an existing
   /// product with the same master_product_id, since one owner may
   /// legitimately stock several brands of the same generic item.
+  /// Finds this owner's own product for the given catalog entry + brand
+  /// (case-insensitive), if one already exists -- lets the Add-from-Catalog
+  /// flow show "already in your shop" instead of silently creating a
+  /// duplicate. Adding the same catalog entry under a genuinely different
+  /// brand is still allowed and won't match here.
+  static Future<Map<String, dynamic>?> findExistingCatalogProduct({
+    required String businessId,
+    required String masterProductId,
+    required String brand,
+  }) async {
+    final client = _clientOrNull;
+    if (client == null) return null;
+
+    final trimmedBrand = brand.trim();
+    var builder = client
+        .from('products')
+        .select('id, name, is_active')
+        .eq('business_id', businessId)
+        .eq('master_product_id', masterProductId);
+    builder = trimmedBrand.isEmpty ? builder.isFilter('brand', null) : builder.ilike('brand', trimmedBrand);
+
+    final rows = await builder.limit(1);
+    final list = List<Map<String, dynamic>>.from(rows as List);
+    return list.isEmpty ? null : list.first;
+  }
+
   static Future<Map<String, dynamic>?> createProductFromMasterProduct({
     required String businessId,
     required MasterProduct masterProduct,
@@ -354,19 +479,21 @@ class CustomerBusinessService {
 
     final createdProduct = await client
         .from('products')
-        .insert(buildProductPayload(
-          businessId: businessId,
-          name: customName?.trim().isNotEmpty == true
-              ? customName!.trim()
-              : masterProduct.productName,
-          unit: masterProduct.baseUnit,
-          category: masterProduct.category,
-          brand: brandOverride?.trim().isNotEmpty == true
-              ? brandOverride!.trim()
-              : masterProduct.brand,
-          imageUrl: masterProduct.imageUrl,
-          masterProductId: masterProduct.id,
-        ))
+        .insert(
+          buildProductPayload(
+            businessId: businessId,
+            name: customName?.trim().isNotEmpty == true
+                ? customName!.trim()
+                : masterProduct.productName,
+            unit: masterProduct.baseUnit,
+            category: masterProduct.category,
+            brand: brandOverride?.trim().isNotEmpty == true
+                ? brandOverride!.trim()
+                : masterProduct.brand,
+            imageUrl: masterProduct.imageUrl,
+            masterProductId: masterProduct.id,
+          ),
+        )
         .select('id, name, unit, category, brand, image_url, master_product_id')
         .single();
 
@@ -380,6 +507,7 @@ class CustomerBusinessService {
     String? category,
     String? brand,
     String? imageUrl,
+    String? description,
   }) async {
     final trimmedName = name.trim();
     if (trimmedName.isEmpty) {
@@ -391,14 +519,17 @@ class CustomerBusinessService {
 
     final createdProduct = await client
         .from('products')
-        .insert(buildProductPayload(
-          businessId: businessId,
-          name: trimmedName,
-          unit: baseUnit,
-          category: category,
-          brand: brand,
-          imageUrl: imageUrl,
-        ))
+        .insert(
+          buildProductPayload(
+            businessId: businessId,
+            name: trimmedName,
+            unit: baseUnit,
+            category: category,
+            brand: brand,
+            imageUrl: imageUrl,
+            description: description,
+          ),
+        )
         .select('id, name, unit, category, brand, image_url, master_product_id')
         .single();
 
@@ -461,8 +592,9 @@ class CustomerBusinessService {
     if (unit != null) updates['unit'] = unit;
     if (packageType != null) updates['package_type'] = packageType;
     if (sellingPrice != null) updates['selling_price'] = sellingPrice;
-    if (minimumOrderQuantity != null)
+    if (minimumOrderQuantity != null) {
       updates['minimum_order_quantity'] = minimumOrderQuantity;
+    }
     if (stockQuantity != null) updates['stock_quantity'] = stockQuantity;
     if (isActive != null) updates['is_active'] = isActive;
 
@@ -485,7 +617,8 @@ class CustomerBusinessService {
     if (client == null) return;
     await client
         .from('product_variants')
-        .update({'is_active': isActive}).eq('id', variantId);
+        .update({'is_active': isActive})
+        .eq('id', variantId);
   }
 
   static Future<void> deleteVariant(String variantId) async {
@@ -520,22 +653,27 @@ class CustomerBusinessService {
 
       if (recipientIds.isEmpty) return;
 
-      final unitLabel =
-          unit?.trim().isNotEmpty == true ? '/${unit!.trim()}' : '';
+      final unitLabel = unit?.trim().isNotEmpty == true
+          ? '/${unit!.trim()}'
+          : '';
 
-      await client.from('notifications').insert(
+      await client
+          .from('notifications')
+          .insert(
             recipientIds
-                .map((recipientId) => {
-                      'recipient_id': recipientId,
-                      'business_id': businessId,
-                      'title': 'Price updated',
-                      'body':
-                          '$productName is now ₹${newPrice.toStringAsFixed(0)}$unitLabel.',
-                      'data': {
-                        'product_name': productName,
-                        'new_price': newPrice
-                      },
-                    })
+                .map(
+                  (recipientId) => {
+                    'recipient_id': recipientId,
+                    'business_id': businessId,
+                    'title': 'Price updated',
+                    'body':
+                        '$productName is now ₹${newPrice.toStringAsFixed(0)}$unitLabel.',
+                    'data': {
+                      'product_name': productName,
+                      'new_price': newPrice,
+                    },
+                  },
+                )
                 .toList(),
           );
     } catch (_) {
@@ -549,7 +687,8 @@ class CustomerBusinessService {
 
     await client
         .from('products')
-        .update({'is_active': false}).eq('id', productId);
+        .update({'is_active': false})
+        .eq('id', productId);
   }
 
   static Future<Map<String, dynamic>?> createInvoiceDraft({
@@ -587,16 +726,16 @@ class CustomerBusinessService {
   /// ones, cheapest first) for variant-aware screens, and a `price` fallback
   /// (cheapest active variant) so any code not yet updated for variants
   /// still has a sane single price to show instead of crashing.
-  static Map<String, dynamic> normalizeProductRow(Map<String, dynamic> row) {
-    final variants = (row['product_variants'] as List<dynamic>? ??
-            const <dynamic>[])
-        .whereType<Map<String, dynamic>>()
-        .where((variant) => variant['is_active'] != false)
-        .toList()
-      ..sort((a, b) => ((a['selling_price'] as num?) ?? 0)
-          .compareTo((b['selling_price'] as num?) ?? 0));
+  static Map<String, dynamic> normalizeProductRow(Map<String, dynamic> row, {bool includeInactiveVariants = false}) {
+    final allVariants = (row['product_variants'] as List<dynamic>? ?? const <dynamic>[]).whereType<Map<String, dynamic>>().toList();
 
-    final cheapest = variants.isNotEmpty ? variants.first : null;
+    final activeVariants = allVariants.where((variant) => variant['is_active'] != false).toList()
+      ..sort((a, b) => ((a['selling_price'] as num?) ?? 0).compareTo((b['selling_price'] as num?) ?? 0));
+
+    final variants = (includeInactiveVariants ? allVariants : activeVariants).toList()
+      ..sort((a, b) => ((a['selling_price'] as num?) ?? 0).compareTo((b['selling_price'] as num?) ?? 0));
+
+    final cheapest = activeVariants.isNotEmpty ? activeVariants.first : null;
 
     return {
       'id': row['id'],
@@ -606,6 +745,9 @@ class CustomerBusinessService {
       'brand': row['brand'],
       'image_url': row['image_url'],
       'master_product_id': row['master_product_id'],
+      'is_active': row['is_active'] ?? true,
+      'created_at': row['created_at'],
+      'description': row['description'],
       'price': (cheapest?['selling_price'] as num?) ?? 0,
       'variants': variants,
     };
@@ -624,7 +766,8 @@ class CustomerBusinessService {
     final customer = await client
         .from('customers')
         .select(
-            'id, business_id, profile_id, display_name, customer_name, shop_name, phone, status')
+          'id, business_id, profile_id, display_name, customer_name, shop_name, phone, status',
+        )
         .eq('phone', normalizedPhone)
         .maybeSingle();
 
@@ -632,12 +775,13 @@ class CustomerBusinessService {
       return null;
     }
 
-    final resolvedName = (displayName ??
-            customer['customer_name'] ??
-            customer['display_name'] ??
-            'Customer')
-        .toString()
-        .trim();
+    final resolvedName =
+        (displayName ??
+                customer['customer_name'] ??
+                customer['display_name'] ??
+                'Customer')
+            .toString()
+            .trim();
     final businessId = customer['business_id'] as String?;
     if (businessId == null || businessId.isEmpty) {
       return null;
@@ -677,12 +821,15 @@ class CustomerBusinessService {
       'status': 'ACTIVE',
     }, onConflict: 'customer_id,business_id');
 
-    await client.from('customers').update({
-      'profile_id': userId,
-      'status': 'ACTIVE',
-      'is_active': true,
-      'display_name': resolvedName,
-    }).eq('id', customer['id']);
+    await client
+        .from('customers')
+        .update({
+          'profile_id': userId,
+          'status': 'ACTIVE',
+          'is_active': true,
+          'display_name': resolvedName,
+        })
+        .eq('id', customer['id']);
 
     return UserProfile(
       id: profileRow['id'] as String,

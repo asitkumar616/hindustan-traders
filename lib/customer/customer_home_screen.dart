@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../src/models/cart_line.dart';
 import '../src/models/product_variant.dart';
 import '../src/screens/login_screen.dart';
 import '../src/services/auth_service.dart';
@@ -28,10 +29,26 @@ import 'customer_profile_screen.dart';
 import 'product_detail_screen.dart';
 
 class CustomerHomeScreen extends StatefulWidget {
-  const CustomerHomeScreen({super.key, required this.businessId, required this.businessName});
+  const CustomerHomeScreen({
+    super.key,
+    required this.businessId,
+    required this.businessName,
+    this.initialCategory,
+    this.initialCartItems,
+  });
 
   final String businessId;
   final String businessName;
+
+  /// Deep-links into this shop already filtered to a category -- used by
+  /// the dashboard's "Shop by Category" shortcuts.
+  final String? initialCategory;
+
+  /// Pre-added to the cart on arrival -- used by the dashboard's Reorder
+  /// and Frequently Ordered "Add" actions, which always land the customer
+  /// on the one business every item already belongs to rather than
+  /// mutating some other screen's cart.
+  final List<CartLine>? initialCartItems;
 
   @override
   State<CustomerHomeScreen> createState() => _CustomerHomeScreenState();
@@ -44,7 +61,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   List<Map<String, dynamic>> _products = const <Map<String, dynamic>>[];
   List<Map<String, dynamic>> _filteredProducts = const <Map<String, dynamic>>[];
   bool _isLoadingCatalog = true;
-  String _category = 'All';
+  late String _category = widget.initialCategory ?? 'All';
 
   @override
   void initState() {
@@ -52,6 +69,29 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     _cart = CartState(businessId: widget.businessId, businessName: widget.businessName);
     _cart.addListener(_onCartChanged);
     _searchController.addListener(_applyFilter);
+    final prefill = widget.initialCartItems;
+    if (prefill != null && prefill.isNotEmpty) {
+      for (final line in prefill) {
+        _cart.setQuantity(
+          productId: line.productId,
+          variantId: line.variantId,
+          productName: line.productName,
+          brand: line.brand,
+          variantQuantity: line.variantQuantity,
+          variantUnit: line.variantUnit,
+          packageType: line.packageType,
+          price: line.price,
+          quantity: line.quantity,
+          minimumOrderQuantity: line.minimumOrderQuantity,
+        );
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${prefill.length} item${prefill.length == 1 ? '' : 's'} added to your cart.')),
+        );
+      });
+    }
     refreshCatalog();
   }
 

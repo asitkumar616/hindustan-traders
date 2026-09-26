@@ -105,4 +105,107 @@ class CustomerDashboardService {
         .where((row) => row.businessId.isNotEmpty)
         .toList(growable: false);
   }
+
+  /// Top products from the customer's own order history, ranked by how many
+  /// separate orders included them. Retains business_id (an order only ever
+  /// belongs to one business, so every item does too) and refreshes each
+  /// with its CURRENT variant price/active-state -- never the historical
+  /// price the item was originally ordered at. A product whose variant is
+  /// no longer active is dropped rather than shown as orderable.
+  static Future<List<Map<String, dynamic>>> getFrequentlyOrderedProducts({int limit = 4}) async {
+    final client = _clientOrNull;
+    final userId = client?.auth.currentUser?.id;
+    if (client == null || userId == null) return [];
+
+    final orderRows = await client
+        .from('orders')
+        .select('id, business_id')
+        .eq('customer_id', userId)
+        .neq('status', 'cancelled');
+    final orders = List<Map<String, dynamic>>.from(orderRows as List);
+    if (orders.isEmpty) return [];
+
+    final businessByOrder = <String, String>{
+      for (final order in orders) order['id'].toString(): order['business_id']?.toString() ?? '',
+    };
+    final orderIds = businessByOrder.keys.toList();
+
+    final itemRows = await client
+        .from('order_items')
+        .select('order_id, product_id, variant_id, product_name, brand, variant_quantity, variant_unit, package_type')
+        .inFilter('order_id', orderIds);
+    final items = List<Map<String, dynamic>>.from(itemRows as List);
+
+    final counts = <String, int>{};
+    final samples = <String, Map<String, dynamic>>{};
+    for (final item in items) {
+      final productId = item['product_id']?.toString();
+      if (productId == null || productId.isEmpty) continue;
+      counts[productId] = (counts[productId] ?? 0) + 1;
+      samples.putIfAbsent(productId, () => {
+            ...item,
+            'business_id': businessByOrder[item['order_id']?.toString()] ?? '',
+          });
+    }
+    if (counts.isEmpty) return [];
+
+    final ranked = counts.keys.toList()..sort((a, b) => counts[b]!.compareTo(counts[a]!));
+
+    final variantIds = ranked
+        .map((productId) => samples[productId]?['variant_id']?.toString())
+        .whereType<String>()
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList();
+    final variantRows = variantIds.isEmpty
+        ? const <Map<String, dynamic>>[]
+        : await client
+            .from('product_variants')
+            .select('id, selling_price, is_active, minimum_order_quantity')
+            .inFilter('id', variantIds);
+    final variantById = <String, Map<String, dynamic>>{
+      for (final variant in variantRows) variant['id'].toString(): variant,
+    };
+
+    final result = <Map<String, dynamic>>[];
+    for (final productId in ranked) {
+      if (result.length >= limit) break;
+      final sample = samples[productId]!;
+      final variantId = sample['variant_id']?.toString();
+      final variant = variantId != null ? variantById[variantId] : null;
+      if (variant == null || variant['is_active'] == false) continue;
+      result.add({
+        ...sample,
+        'current_price': (variant['selling_price'] as num?) ?? 0,
+        'minimum_order_quantity': (variant['minimum_order_quantity'] as num?) ?? 1,
+        'order_count': counts[productId],
+      });
+    }
+    return result;
+  }
+
+  /// Distinct product categories across the given businesses' active
+  /// catalogs -- used for the dashboard's "Shop by Category" shortcuts,
+  /// which need a cross-shop category list before any single shop is
+  /// chosen. Categories are free text set by each owner (no categories
+  /// table), so this reads the live set rather than a hardcoded list.
+  static Future<List<String>> getCategoriesForBusinesses(List<String> businessIds) async {
+    final client = _clientOrNull;
+    if (client == null || businessIds.isEmpty) return [];
+
+    final rows = await client
+        .from('products')
+        .select('category')
+        .inFilter('business_id', businessIds)
+        .eq('is_active', true)
+        .not('category', 'is', null);
+
+    final categories = List<Map<String, dynamic>>.from(rows as List)
+        .map((row) => row['category']?.toString() ?? '')
+        .where((category) => category.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
+    return categories;
+  }
 }

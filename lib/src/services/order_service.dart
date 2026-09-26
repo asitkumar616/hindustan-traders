@@ -74,6 +74,25 @@ class OrderService {
     return List<Map<String, dynamic>>.from(response as List);
   }
 
+  /// Current selling_price/is_active for a set of variant ids -- used by
+  /// Reorder to re-price a previous order's items rather than silently
+  /// reusing what they cost at the time, and to drop any item whose variant
+  /// is no longer active instead of ordering it anyway. Keyed by variant id
+  /// so a caller can look up each order_item's `variant_id` directly.
+  static Future<Map<String, Map<String, dynamic>>> getCurrentVariantStates(List<String> variantIds) async {
+    final client = _clientOrNull;
+    if (client == null || variantIds.isEmpty) return {};
+
+    final response = await client
+        .from('product_variants')
+        .select('id, selling_price, is_active, minimum_order_quantity')
+        .inFilter('id', variantIds);
+
+    return {
+      for (final row in List<Map<String, dynamic>>.from(response as List)) row['id'].toString(): row,
+    };
+  }
+
   static Future<List<Map<String, dynamic>>> getOrdersForBusiness(String businessId) async {
     final client = _clientOrNull;
     if (client == null) return [];

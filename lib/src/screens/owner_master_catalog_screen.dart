@@ -143,6 +143,18 @@ class _OwnerMasterCatalogScreenState extends State<OwnerMasterCatalogScreen> {
 
     setState(() => _adding = true);
     try {
+      final existing = await CustomerBusinessService.findExistingCatalogProduct(
+        businessId: widget.businessId,
+        masterProductId: product.id,
+        brand: choice.brand,
+      );
+      if (existing != null) {
+        if (!mounted) return;
+        setState(() => _adding = false);
+        await _showAlreadyInShopDialog(existing);
+        return;
+      }
+
       final created = await CustomerBusinessService.createProductFromMasterProduct(
         businessId: widget.businessId,
         masterProduct: product,
@@ -177,6 +189,53 @@ class _OwnerMasterCatalogScreenState extends State<OwnerMasterCatalogScreen> {
     }
   }
 
+  /// Prevents a silent duplicate when this owner already added this catalog
+  /// entry under the same brand. An active match just gets acknowledged; an
+  /// inactive one (previously deactivated) offers to bring it back instead
+  /// of creating a second row for the same product.
+  Future<void> _showAlreadyInShopDialog(Map<String, dynamic> existing) async {
+    final isActive = existing['is_active'] != false;
+    final name = existing['name']?.toString() ?? 'This product';
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Already in your shop'),
+        content: Text(
+          isActive
+              ? '$name is already in your shop.'
+              : '$name was previously removed from your shop.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+          if (isActive)
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                Navigator.pop(context, true);
+              },
+              child: const Text('View Product'),
+            )
+          else
+            FilledButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                try {
+                  await CustomerBusinessService.setProductActive(existing['id']?.toString() ?? '', true);
+                  if (!mounted) return;
+                  Navigator.pop(context, true);
+                } catch (error) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Unable to reactivate: $error')));
+                }
+              },
+              child: const Text('Reactivate Product'),
+            ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _openCustomProduct() async {
     final result = await Navigator.push<bool>(
       context,
@@ -198,11 +257,15 @@ class _OwnerMasterCatalogScreenState extends State<OwnerMasterCatalogScreen> {
         backgroundColor: AppColors.surfaceMuted,
         elevation: 0,
         foregroundColor: AppColors.textPrimary,
-        title: const Text('Add Products to My Shop'),
+        title: const Text('Product Catalog'),
       ),
       body: SafeArea(
         child: Column(
           children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.sm, AppSpacing.xl, 0),
+              child: Text('Choose products to add to your shop.', style: AppTextStyles.bodyMuted),
+            ),
             Padding(
               padding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.sm, AppSpacing.xl, 0),
               child: Container(
@@ -215,7 +278,7 @@ class _OwnerMasterCatalogScreenState extends State<OwnerMasterCatalogScreen> {
                   controller: _searchController,
                   onSubmitted: (_) => _load(),
                   decoration: InputDecoration(
-                    hintText: 'Search grocery products...',
+                    hintText: 'Search rice, dal, oil, atta...',
                     prefixIcon: const Icon(Icons.search_rounded),
                     suffixIcon: IconButton(icon: const Icon(Icons.arrow_forward_rounded), onPressed: _load),
                     border: InputBorder.none,

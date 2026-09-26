@@ -23,28 +23,28 @@ class _SuggestedSize {
   }
 }
 
+/// The two suggestions that cover the common case (sell loose by the base
+/// unit, and sell in one bulk pack size) -- matches the redesigned "Sell by
+/// KG / Sell by Bag" checkboxes. Anything beyond this (a 5 KG pack, a second
+/// bag size, a carton of pieces...) is still fully supported via "Add
+/// Custom Size", which was never limited to these two.
 List<_SuggestedSize> _suggestedSizesFor(String baseUnit) {
   switch (baseUnit) {
     case 'LTR':
     case 'ML':
       return const [
         _SuggestedSize(1, 'LTR', 'LOOSE'),
-        _SuggestedSize(5, 'LTR', 'LOOSE'),
         _SuggestedSize(15, 'LTR', 'BOX'),
       ];
     case 'PCS':
       return const [
         _SuggestedSize(1, 'PCS', 'LOOSE'),
         _SuggestedSize(12, 'PCS', 'BOX'),
-        _SuggestedSize(24, 'PCS', 'CARTON'),
       ];
     default:
       return const [
         _SuggestedSize(1, 'KG', 'LOOSE'),
-        _SuggestedSize(5, 'KG', 'LOOSE'),
-        _SuggestedSize(10, 'KG', 'LOOSE'),
         _SuggestedSize(25, 'KG', 'BAG'),
-        _SuggestedSize(50, 'KG', 'BAG'),
       ];
   }
 }
@@ -56,37 +56,57 @@ List<_SuggestedSize> _suggestedSizesFor(String baseUnit) {
 class _VariantRow {
   _VariantRow({
     this.existingVariantId,
-    required this.quantity,
+    required double quantity,
     required this.unit,
     required this.packageType,
     String? price,
     String? moq,
     String? stock,
     this.enabled = true,
-  })  : priceController = TextEditingController(text: price ?? ''),
+  })  : quantityController = TextEditingController(
+          text: quantity == quantity.roundToDouble() ? quantity.toInt().toString() : quantity.toString(),
+        ),
+        priceController = TextEditingController(text: price ?? ''),
         moqController = TextEditingController(text: moq ?? '1'),
         stockController = TextEditingController(text: stock ?? '');
 
   final String? existingVariantId;
-  double quantity;
-  String unit;
-  String packageType;
+  final String unit;
+  final String packageType;
   bool enabled;
+  final TextEditingController quantityController;
   final TextEditingController priceController;
   final TextEditingController moqController;
   final TextEditingController stockController;
+
+  double get quantity => double.tryParse(quantityController.text.trim()) ?? 1;
+
+  /// LOOSE rows read as "Sell by KG (Small quantity)"; bulk-pack rows read
+  /// as "Sell by Bag (Bulk quantity)" -- falls back to the plain size label
+  /// for anything a custom size adds beyond these two common shapes.
+  bool get _isCommonLoose => packageType == 'LOOSE';
+  String get title => _isCommonLoose ? 'Sell by $unit' : 'Sell by $packageType';
+  String get subtitle => _isCommonLoose ? 'Small quantity' : 'Bulk quantity';
 
   String get label {
     final qty = quantity == quantity.roundToDouble() ? quantity.toInt().toString() : quantity.toString();
     final base = '$qty $unit';
     return packageType == 'LOOSE' ? base : '$base $packageType';
   }
+
+  void dispose() {
+    quantityController.dispose();
+    priceController.dispose();
+    moqController.dispose();
+    stockController.dispose();
+  }
 }
 
 /// Lets an owner pick which pack sizes they sell a product in and set each
 /// one's own price -- deliberately never derives one price from another
 /// (e.g. bag price is NOT quantity x loose price), since a wholesaler may
-/// intentionally price a full bag below the per-kg rate.
+/// intentionally price a full bag below the per-kg rate. Also doubles as
+/// the "Edit Product" screen when [existingVariants] is non-empty.
 class OwnerConfigureVariantsScreen extends StatefulWidget {
   const OwnerConfigureVariantsScreen({
     super.key,
@@ -95,6 +115,9 @@ class OwnerConfigureVariantsScreen extends StatefulWidget {
     required this.businessId,
     this.baseUnit = 'KG',
     this.existingVariants = const <ProductVariant>[],
+    this.category,
+    this.brand,
+    this.isProductActive = true,
   });
 
   final String productId;
@@ -102,6 +125,9 @@ class OwnerConfigureVariantsScreen extends StatefulWidget {
   final String businessId;
   final String baseUnit;
   final List<ProductVariant> existingVariants;
+  final String? category;
+  final String? brand;
+  final bool isProductActive;
 
   @override
   State<OwnerConfigureVariantsScreen> createState() => _OwnerConfigureVariantsScreenState();
@@ -109,7 +135,10 @@ class OwnerConfigureVariantsScreen extends StatefulWidget {
 
 class _OwnerConfigureVariantsScreenState extends State<OwnerConfigureVariantsScreen> {
   late List<_VariantRow> _rows;
+  late bool _isProductActive = widget.isProductActive;
   bool _saving = false;
+
+  bool get _isEditing => widget.existingVariants.isNotEmpty;
 
   @override
   void initState() {
@@ -146,14 +175,21 @@ class _OwnerConfigureVariantsScreenState extends State<OwnerConfigureVariantsScr
         ));
       }
     }
+
+    for (final row in _rows) {
+      row.priceController.addListener(_refreshExample);
+      row.quantityController.addListener(_refreshExample);
+    }
+  }
+
+  void _refreshExample() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
     for (final row in _rows) {
-      row.priceController.dispose();
-      row.moqController.dispose();
-      row.stockController.dispose();
+      row.dispose();
     }
     super.dispose();
   }
@@ -217,7 +253,10 @@ class _OwnerConfigureVariantsScreenState extends State<OwnerConfigureVariantsScr
                         }
                         Navigator.pop(sheetContext, true);
                         setState(() {
-                          _rows.add(_VariantRow(quantity: qty, unit: unit, packageType: packageType, enabled: true));
+                          final row = _VariantRow(quantity: qty, unit: unit, packageType: packageType, enabled: true);
+                          row.priceController.addListener(_refreshExample);
+                          row.quantityController.addListener(_refreshExample);
+                          _rows.add(row);
                         });
                       },
                     ),
@@ -235,11 +274,25 @@ class _OwnerConfigureVariantsScreenState extends State<OwnerConfigureVariantsScr
     }
   }
 
+  Future<void> _toggleProductActive() async {
+    try {
+      await CustomerBusinessService.setProductActive(widget.productId, !_isProductActive);
+      if (!mounted) return;
+      setState(() => _isProductActive = !_isProductActive);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_isProductActive ? 'Product activated.' : 'Product deactivated.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Unable to update status: $error')));
+    }
+  }
+
   Future<void> _save() async {
     final enabledRows = _rows.where((row) => row.enabled).toList();
     if (enabledRows.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enable at least one pack size.')),
+        const SnackBar(content: Text('Enable at least one selling option.')),
       );
       return;
     }
@@ -248,7 +301,13 @@ class _OwnerConfigureVariantsScreenState extends State<OwnerConfigureVariantsScr
       final price = double.tryParse(row.priceController.text.trim());
       if (price == null || price <= 0) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Enter a valid price for ${row.label}.')),
+          SnackBar(content: Text('Enter a valid price for ${row.title}.')),
+        );
+        return;
+      }
+      if (row.quantity <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Enter a valid quantity for ${row.title}.')),
         );
         return;
       }
@@ -300,13 +359,15 @@ class _OwnerConfigureVariantsScreenState extends State<OwnerConfigureVariantsScr
 
   @override
   Widget build(BuildContext context) {
+    final subtitleParts = [widget.category, widget.brand].where((v) => v != null && v.isNotEmpty).join(' • ');
+
     return Scaffold(
       backgroundColor: AppColors.surfaceMuted,
       appBar: AppBar(
         backgroundColor: AppColors.surfaceMuted,
         elevation: 0,
         foregroundColor: AppColors.textPrimary,
-        title: Text(widget.productName),
+        title: Text(_isEditing ? 'Edit Product' : 'Add Product'),
       ),
       body: SafeArea(
         child: Column(
@@ -315,7 +376,42 @@ class _OwnerConfigureVariantsScreenState extends State<OwnerConfigureVariantsScr
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.md, AppSpacing.xl, AppSpacing.xl),
                 children: [
-                  const Text('How do you sell this product?', style: AppTextStyles.subheading),
+                  if (_isEditing) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(child: Text(widget.productName, style: AppTextStyles.heading, overflow: TextOverflow.ellipsis)),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: _isProductActive ? const Color(0xFFE1F7E8) : const Color(0xFFF0F0F0),
+                                      borderRadius: BorderRadius.circular(AppRadius.pill),
+                                    ),
+                                    child: Text(
+                                      _isProductActive ? 'Active' : 'Inactive',
+                                      style: TextStyle(
+                                        color: _isProductActive ? const Color(0xFF2E7D32) : AppColors.textSecondary,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (subtitleParts.isNotEmpty) Text(subtitleParts, style: AppTextStyles.bodyMuted),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                  ],
+                  const Text('Selling Options', style: AppTextStyles.subheading),
                   const SizedBox(height: AppSpacing.md),
                   ..._rows.map((row) => Padding(
                         padding: const EdgeInsets.only(bottom: AppSpacing.md),
@@ -330,22 +426,59 @@ class _OwnerConfigureVariantsScreenState extends State<OwnerConfigureVariantsScr
                                     activeColor: AppColors.ownerPrimary,
                                     onChanged: (value) => setState(() => row.enabled = value ?? false),
                                   ),
-                                  Expanded(child: Text(row.label, style: AppTextStyles.subheading)),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(row.title, style: AppTextStyles.subheading),
+                                        Text(row.subtitle, style: AppTextStyles.caption),
+                                      ],
+                                    ),
+                                  ),
                                 ],
                               ),
                               if (row.enabled) ...[
                                 const SizedBox(height: AppSpacing.sm),
+                                if (row.packageType != 'LOOSE')
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                                    child: TextField(
+                                      controller: row.quantityController,
+                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                      decoration: InputDecoration(labelText: '${row.packageType == 'BAG' ? 'Bag' : 'Pack'} Size (${row.unit})', isDense: true),
+                                    ),
+                                  ),
                                 Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Expanded(
                                       flex: 2,
                                       child: TextField(
                                         controller: row.priceController,
                                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                        decoration: const InputDecoration(labelText: 'Selling Price (₹)', isDense: true),
+                                        decoration: InputDecoration(labelText: 'Price per ${row.packageType == 'LOOSE' ? row.unit : row.packageType} (₹)', isDense: true),
                                       ),
                                     ),
                                     const SizedBox(width: AppSpacing.sm),
+                                    if (row.priceController.text.trim().isNotEmpty)
+                                      Expanded(
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.ownerPrimary.withValues(alpha: 0.08),
+                                            borderRadius: BorderRadius.circular(AppRadius.sm),
+                                          ),
+                                          child: Text(
+                                            'Example\n₹${row.priceController.text.trim()} / ${row.label}',
+                                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.ownerPrimary),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: AppSpacing.sm),
+                                Row(
+                                  children: [
                                     Expanded(
                                       child: TextField(
                                         controller: row.moqController,
@@ -353,13 +486,15 @@ class _OwnerConfigureVariantsScreenState extends State<OwnerConfigureVariantsScr
                                         decoration: const InputDecoration(labelText: 'Min. order', isDense: true),
                                       ),
                                     ),
+                                    const SizedBox(width: AppSpacing.sm),
+                                    Expanded(
+                                      child: TextField(
+                                        controller: row.stockController,
+                                        keyboardType: TextInputType.number,
+                                        decoration: const InputDecoration(labelText: 'Stock (optional)', isDense: true),
+                                      ),
+                                    ),
                                   ],
-                                ),
-                                const SizedBox(height: AppSpacing.sm),
-                                TextField(
-                                  controller: row.stockController,
-                                  keyboardType: TextInputType.number,
-                                  decoration: const InputDecoration(labelText: 'Stock (optional)', isDense: true),
                                 ),
                               ],
                             ],
@@ -376,10 +511,22 @@ class _OwnerConfigureVariantsScreenState extends State<OwnerConfigureVariantsScr
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(AppSpacing.xl, 0, AppSpacing.xl, AppSpacing.xl),
-              child: AppPrimaryButton(
-                label: 'Save',
-                onPressed: _saving ? null : _save,
-                loading: _saving,
+              child: Column(
+                children: [
+                  if (_isEditing) ...[
+                    AppSecondaryButton(
+                      label: _isProductActive ? 'Deactivate Product' : 'Activate Product',
+                      icon: _isProductActive ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                      onPressed: _saving ? null : _toggleProductActive,
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                  ],
+                  AppPrimaryButton(
+                    label: _isEditing ? 'Update Product' : 'Save Product',
+                    onPressed: _saving ? null : _save,
+                    loading: _saving,
+                  ),
+                ],
               ),
             ),
           ],
