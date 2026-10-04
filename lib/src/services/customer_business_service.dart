@@ -273,6 +273,7 @@ class CustomerBusinessService {
     String? imageUrl,
     String? masterProductId,
     String? description,
+    Map<String, dynamic>? specifications,
     bool isActive = true,
   }) {
     return {
@@ -286,6 +287,7 @@ class CustomerBusinessService {
       'image_url': imageUrl,
       'master_product_id': masterProductId,
       'description': description,
+      'specifications': specifications,
       'is_active': isActive,
     };
   }
@@ -385,13 +387,13 @@ class CustomerBusinessService {
         );
       }
 
-      await _notifyCustomersOfPriceChange(
+      final productName = name?.trim().isNotEmpty == true ? name!.trim() : 'A product';
+      final unitLabel = unit?.trim();
+      await _notifyCustomers(
         businessId: businessId,
-        productName: name?.trim().isNotEmpty == true
-            ? name!.trim()
-            : 'A product',
-        newPrice: price,
-        unit: unit,
+        title: 'Price updated',
+        body: '$productName is now ₹${price.toStringAsFixed(0)}${unitLabel?.isNotEmpty == true ? '/$unitLabel' : ''}.',
+        data: {'product_name': productName, 'new_price': price},
       );
     }
   }
@@ -425,8 +427,14 @@ class CustomerBusinessService {
     if (category != null && category.isNotEmpty && category != 'Others') {
       builder = builder.eq('category', category);
     }
-    if (query != null && query.trim().isNotEmpty) {
-      builder = builder.ilike('product_name', '%${query.trim()}%');
+    final trimmedQuery = query?.trim() ?? '';
+    if (trimmedQuery.isNotEmpty) {
+      // Matches product name, brand, or category -- e.g. "fan" finds
+      // "Ceiling Fan", "samsung" finds every Samsung-branded product.
+      final safe = trimmedQuery.replaceAll(RegExp(r'[,()%]'), '');
+      builder = builder.or(
+        'product_name.ilike.%$safe%,brand.ilike.%$safe%,category.ilike.%$safe%',
+      );
     }
 
     final response = await builder.order('product_name', ascending: true);
@@ -498,9 +506,10 @@ class CustomerBusinessService {
                 : masterProduct.brand,
             imageUrl: masterProduct.imageUrl,
             masterProductId: masterProduct.id,
+            specifications: masterProduct.specifications,
           ),
         )
-        .select('id, name, unit, category, brand, image_url, master_product_id')
+        .select('id, name, unit, category, brand, image_url, master_product_id, specifications')
         .single();
 
     return createdProduct;
@@ -516,6 +525,7 @@ class CustomerBusinessService {
     String? brand,
     String? imageUrl,
     String? description,
+    Map<String, dynamic>? specifications,
   }) async {
     final trimmedName = name.trim();
     if (trimmedName.isEmpty) {
@@ -538,9 +548,10 @@ class CustomerBusinessService {
             brand: brand,
             imageUrl: imageUrl,
             description: description,
+            specifications: specifications,
           ),
         )
-        .select('id, name, unit, category, brand, image_url, master_product_id')
+        .select('id, name, unit, category, brand, image_url, master_product_id, specifications')
         .single();
 
     return createdProduct;
@@ -558,6 +569,9 @@ class CustomerBusinessService {
     required double sellingPrice,
     double minimumOrderQuantity = 1,
     double? stockQuantity,
+    double? mrp,
+    double? taxRate,
+    String? sku,
     bool isActive = true,
   }) async {
     final client = _clientOrNull;
@@ -573,15 +587,22 @@ class CustomerBusinessService {
           'selling_price': sellingPrice,
           'minimum_order_quantity': minimumOrderQuantity,
           'stock_quantity': stockQuantity,
+          'mrp': mrp,
+          'tax_rate': taxRate,
+          'sku': sku,
           'is_active': isActive,
         })
         .select()
         .single();
   }
 
-  /// Updates a single variant's fields. If [notifyBusinessId] is given and
-  /// the price changed, broadcasts a price-change notification the same way
-  /// the old flat updateProduct did.
+  /// Updates a single variant's fields. If [notifyBusinessId] is given,
+  /// compares the price/stock actually stored beforehand against the new
+  /// values and only notifies customers for whichever genuinely changed --
+  /// callers (e.g. the Selling Options screen) resend every field on every
+  /// save regardless of whether it was touched, so notifying off the raw
+  /// arguments alone would spam a "stock updated" message on every price
+  /// edit and vice versa.
   static Future<void> updateVariant({
     required String variantId,
     double? quantity,
@@ -590,6 +611,9 @@ class CustomerBusinessService {
     double? sellingPrice,
     double? minimumOrderQuantity,
     double? stockQuantity,
+    double? mrp,
+    double? taxRate,
+    String? sku,
     bool? isActive,
     String? notifyBusinessId,
     String? notifyProductName,
@@ -606,20 +630,73 @@ class CustomerBusinessService {
       updates['minimum_order_quantity'] = minimumOrderQuantity;
     }
     if (stockQuantity != null) updates['stock_quantity'] = stockQuantity;
+    if (mrp != null) updates['mrp'] = mrp;
+    if (taxRate != null) updates['tax_rate'] = taxRate;
+    if (sku != null) updates['sku'] = sku;
     if (isActive != null) updates['is_active'] = isActive;
 
     if (updates.isEmpty) return;
 
+    Map<String, dynamic>? before;
+    if (notifyBusinessId != null && (sellingPrice != null || stockQuantity != null)) {
+      before = await client
+          .from('product_variants')
+          .select('selling_price, stock_quantity, unit')
+          .eq('id', variantId)
+          .maybeSingle();
+    }
+
     await client.from('product_variants').update(updates).eq('id', variantId);
 
-    if (sellingPrice != null && notifyBusinessId != null) {
-      await _notifyCustomersOfPriceChange(
+    if (notifyBusinessId == null) return;
+    final productName = notifyProductName ?? 'A product';
+
+    final priceChanged = sellingPrice != null &&
+        before != null &&
+        (before['selling_price'] as num?)?.toDouble() != sellingPrice;
+    if (priceChanged) {
+      final unitLabel = (unit ?? before['unit']?.toString())?.trim();
+      await _notifyCustomers(
         businessId: notifyBusinessId,
-        productName: notifyProductName ?? 'A product',
-        newPrice: sellingPrice,
-        unit: unit,
+        title: 'Price updated',
+        body: '$productName is now ₹${sellingPrice.toStringAsFixed(0)}${unitLabel?.isNotEmpty == true ? '/$unitLabel' : ''}.',
+        data: {'product_name': productName, 'new_price': sellingPrice},
       );
     }
+
+    final previousStock = (before?['stock_quantity'] as num?)?.toDouble();
+    final stockChanged = stockQuantity != null && before != null && previousStock != stockQuantity;
+    if (stockChanged) {
+      final wasOut = (previousStock ?? 0) <= 0;
+      final isNowIn = stockQuantity > 0;
+      final title = isNowIn && wasOut ? 'Back in stock' : (stockQuantity <= 0 ? 'Out of stock' : 'Stock updated');
+      final body = isNowIn && wasOut
+          ? '$productName is back in stock.'
+          : stockQuantity <= 0
+              ? '$productName is now out of stock.'
+              : '$productName stock has been updated.';
+      await _notifyCustomers(
+        businessId: notifyBusinessId,
+        title: title,
+        body: body,
+        data: {'product_name': productName, 'new_stock': stockQuantity},
+      );
+    }
+  }
+
+  /// Notifies every registered customer of this business that a brand-new
+  /// product was added to the shop -- called once, right after a new
+  /// product's first selling option is saved (not on every subsequent edit).
+  static Future<void> notifyCustomersOfNewProduct({
+    required String businessId,
+    required String productName,
+  }) {
+    return _notifyCustomers(
+      businessId: businessId,
+      title: 'New product added',
+      body: '$productName is now available.',
+      data: {'product_name': productName},
+    );
   }
 
   static Future<void> setVariantActive(String variantId, bool isActive) async {
@@ -635,15 +712,16 @@ class CustomerBusinessService {
     await setVariantActive(variantId, false);
   }
 
-  // Broadcasts a price change to every registered customer of this
-  // business. Non-fatal by design: the price itself is already saved by
+  // Broadcasts a notification to every registered customer of this
+  // business (used for price changes, stock changes, and new products).
+  // Non-fatal by design: whatever triggered this has already been saved by
   // the time this runs, so a failure here (e.g. no registered customers,
   // or an RLS restriction) must not surface as a failed product update.
-  static Future<void> _notifyCustomersOfPriceChange({
+  static Future<void> _notifyCustomers({
     required String businessId,
-    required String productName,
-    required double newPrice,
-    String? unit,
+    required String title,
+    required String body,
+    Map<String, dynamic>? data,
   }) async {
     try {
       final client = _clientOrNull;
@@ -663,10 +741,6 @@ class CustomerBusinessService {
 
       if (recipientIds.isEmpty) return;
 
-      final unitLabel = unit?.trim().isNotEmpty == true
-          ? '/${unit!.trim()}'
-          : '';
-
       await client
           .from('notifications')
           .insert(
@@ -675,13 +749,9 @@ class CustomerBusinessService {
                   (recipientId) => {
                     'recipient_id': recipientId,
                     'business_id': businessId,
-                    'title': 'Price updated',
-                    'body':
-                        '$productName is now ₹${newPrice.toStringAsFixed(0)}$unitLabel.',
-                    'data': {
-                      'product_name': productName,
-                      'new_price': newPrice,
-                    },
+                    'title': title,
+                    'body': body,
+                    'data': data,
                   },
                 )
                 .toList(),

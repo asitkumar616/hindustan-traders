@@ -13,6 +13,8 @@ import '../widgets/app_filter_chip.dart';
 import '../widgets/app_loading_state.dart';
 import '../widgets/app_primary_button.dart';
 import '../widgets/catalog_product_image.dart';
+import 'owner_business_categories_screen.dart';
+import 'owner_bulk_configure_products_screen.dart';
 import 'owner_configure_variants_screen.dart';
 import 'owner_custom_product_screen.dart';
 
@@ -35,8 +37,19 @@ class _OwnerMasterCatalogScreenState extends State<OwnerMasterCatalogScreen> {
   String _category = 'All';
   bool _loading = true;
   List<MasterProduct> _products = const <MasterProduct>[];
-  List<CatalogCategory> _categories = const <CatalogCategory>[];
+  List<CatalogCategory> _allCategories = const <CatalogCategory>[];
+  Set<String> _businessCategoryIds = <String>{};
   bool _adding = false;
+  bool _bulkAdding = false;
+  final Set<String> _selectedIds = <String>{};
+
+  /// The categories shown as chips: this business's own selection ("What
+  /// does your business sell?"), or every category when it hasn't chosen
+  /// yet -- so an owner who never visited that screen sees the same full
+  /// list as before this feature existed.
+  List<CatalogCategory> get _visibleCategories => _businessCategoryIds.isEmpty
+      ? _allCategories
+      : _allCategories.where((c) => _businessCategoryIds.contains(c.id)).toList();
 
   @override
   void initState() {
@@ -48,8 +61,22 @@ class _OwnerMasterCatalogScreenState extends State<OwnerMasterCatalogScreen> {
 
   Future<void> _loadCategories() async {
     final categories = await CategoryService.fetchTopLevel();
+    final selected = await CategoryService.fetchBusinessCategoryIds(widget.businessId);
     if (!mounted) return;
-    setState(() => _categories = categories);
+    setState(() {
+      _allCategories = categories;
+      _businessCategoryIds = selected;
+    });
+  }
+
+  Future<void> _openCategoryPicker() async {
+    final saved = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => OwnerBusinessCategoriesScreen(businessId: widget.businessId)),
+    );
+    if (saved == true) {
+      await _loadCategories();
+    }
   }
 
   @override
@@ -59,7 +86,10 @@ class _OwnerMasterCatalogScreenState extends State<OwnerMasterCatalogScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _selectedIds.clear();
+    });
     try {
       final products = await CustomerBusinessService.getMasterProducts(
         category: _category == 'All' ? null : _category,
@@ -199,6 +229,77 @@ class _OwnerMasterCatalogScreenState extends State<OwnerMasterCatalogScreen> {
     }
   }
 
+  /// Links every checked catalog product into the shop in one pass -- no
+  /// per-item brand prompt (the bulk path always uses the catalog entry's
+  /// own brand, matching the spec's "configure everything at once" UX),
+  /// then opens one shared screen to set each one's price/stock.
+  Future<void> _addSelectedToShop() async {
+    final selectedProducts = _products.where((p) => _selectedIds.contains(p.id)).toList();
+    if (selectedProducts.isEmpty) return;
+
+    setState(() => _bulkAdding = true);
+    final created = <BulkCatalogProduct>[];
+    final skipped = <String>[];
+    try {
+      for (final product in selectedProducts) {
+        final existing = await CustomerBusinessService.findExistingCatalogProduct(
+          businessId: widget.businessId,
+          masterProductId: product.id,
+          brand: product.brand ?? '',
+        );
+        if (existing != null) {
+          skipped.add(product.productName);
+          continue;
+        }
+
+        final row = await CustomerBusinessService.createProductFromMasterProduct(
+          businessId: widget.businessId,
+          masterProduct: product,
+        );
+        if (row == null) continue;
+        created.add(BulkCatalogProduct(
+          id: row['id']?.toString() ?? '',
+          name: row['name']?.toString() ?? product.productName,
+          unit: product.baseUnit,
+          category: product.category,
+          brand: row['brand']?.toString(),
+          imageUrl: row['image_url']?.toString(),
+        ));
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _bulkAdding = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to add products: $error')),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _bulkAdding = false;
+      _selectedIds.clear();
+    });
+
+    if (skipped.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Already in your shop, skipped: ${skipped.join(', ')}')),
+      );
+    }
+    if (created.isEmpty) return;
+
+    final saved = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OwnerBulkConfigureProductsScreen(businessId: widget.businessId, products: created),
+      ),
+    );
+    if (!mounted) return;
+    if (saved == true) {
+      Navigator.pop(context, true);
+    }
+  }
+
   /// Prevents a silent duplicate when this owner already added this catalog
   /// entry under the same brand. An active match just gets acknowledged; an
   /// inactive one (previously deactivated) offers to bring it back instead
@@ -259,7 +360,8 @@ class _OwnerMasterCatalogScreenState extends State<OwnerMasterCatalogScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final categories = ['All', ..._categories.map((c) => c.name)];
+    final categories = ['All', ..._visibleCategories.map((c) => c.name)];
+    final hasSelection = _selectedIds.isNotEmpty;
 
     return Scaffold(
       backgroundColor: AppColors.surfaceMuted,
@@ -282,7 +384,6 @@ class _OwnerMasterCatalogScreenState extends State<OwnerMasterCatalogScreen> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(AppRadius.sm),
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
                 ),
                 child: TextField(
                   controller: _searchController,
@@ -306,9 +407,32 @@ class _OwnerMasterCatalogScreenState extends State<OwnerMasterCatalogScreen> {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-                itemCount: categories.length,
+                itemCount: categories.length + 1,
                 separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
                 itemBuilder: (context, index) {
+                  if (index == categories.length) {
+                    return InkWell(
+                      onTap: _openCategoryPicker,
+                      borderRadius: BorderRadius.circular(AppRadius.pill),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
+                          border: Border.all(color: AppColors.ownerPrimary),
+                        ),
+                        alignment: Alignment.center,
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.add_rounded, size: 16, color: AppColors.ownerPrimary),
+                            SizedBox(width: 2),
+                            Text('Category', style: TextStyle(color: AppColors.ownerPrimary, fontWeight: FontWeight.w700, fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
                   final category = categories[index];
                   return AppFilterChip(
                     label: category,
@@ -342,11 +466,23 @@ class _OwnerMasterCatalogScreenState extends State<OwnerMasterCatalogScreen> {
                           itemCount: _products.length,
                           itemBuilder: (context, index) {
                             final product = _products[index];
+                            final selected = _selectedIds.contains(product.id);
                             return Padding(
                               padding: const EdgeInsets.only(bottom: AppSpacing.md),
                               child: AppCard(
                                 child: Row(
                                   children: [
+                                    Checkbox(
+                                      value: selected,
+                                      activeColor: AppColors.ownerPrimary,
+                                      onChanged: (_) => setState(() {
+                                        if (selected) {
+                                          _selectedIds.remove(product.id);
+                                        } else {
+                                          _selectedIds.add(product.id);
+                                        }
+                                      }),
+                                    ),
                                     CatalogProductImage(
                                       productName: product.productName,
                                       category: product.category,
@@ -365,10 +501,11 @@ class _OwnerMasterCatalogScreenState extends State<OwnerMasterCatalogScreen> {
                                         ],
                                       ),
                                     ),
-                                    FilledButton(
-                                      onPressed: _adding ? null : () => _addToShop(product),
-                                      child: const Text('Add to My Shop'),
-                                    ),
+                                    if (!hasSelection)
+                                      FilledButton(
+                                        onPressed: _adding ? null : () => _addToShop(product),
+                                        child: const Text('Add'),
+                                      ),
                                   ],
                                 ),
                               ),
@@ -376,14 +513,24 @@ class _OwnerMasterCatalogScreenState extends State<OwnerMasterCatalogScreen> {
                           },
                         ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.xl, 0, AppSpacing.xl, AppSpacing.lg),
-              child: OutlinedButton.icon(
-                onPressed: _openCustomProduct,
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Create Custom Product'),
+            if (hasSelection)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(AppSpacing.xl, 0, AppSpacing.xl, AppSpacing.lg),
+                child: AppPrimaryButton(
+                  label: 'Add ${_selectedIds.length} Product${_selectedIds.length == 1 ? '' : 's'}',
+                  onPressed: _bulkAdding ? null : _addSelectedToShop,
+                  loading: _bulkAdding,
+                ),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.fromLTRB(AppSpacing.xl, 0, AppSpacing.xl, AppSpacing.lg),
+                child: OutlinedButton.icon(
+                  onPressed: _openCustomProduct,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Create Custom Product'),
+                ),
               ),
-            ),
           ],
         ),
       ),

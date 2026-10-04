@@ -9,6 +9,7 @@ class MasterProduct {
   final String? imageUrl;
   final String baseUnit;
   final bool isActive;
+  final Map<String, dynamic>? specifications;
 
   const MasterProduct({
     required this.id,
@@ -21,6 +22,7 @@ class MasterProduct {
     this.imageUrl,
     required this.baseUnit,
     this.isActive = true,
+    this.specifications,
   });
 
   factory MasterProduct.fromMap(Map<String, dynamic> map) {
@@ -35,6 +37,7 @@ class MasterProduct {
       imageUrl: map['image_url']?.toString(),
       baseUnit: map['base_unit']?.toString() ?? 'KG',
       isActive: map['is_active'] as bool? ?? true,
+      specifications: map['specifications'] as Map<String, dynamic>?,
     );
   }
 }

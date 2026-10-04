@@ -7,6 +7,9 @@ class ProductVariant {
   final double sellingPrice;
   final double minimumOrderQuantity;
   final double? stockQuantity;
+  final double? mrp;
+  final double? taxRate;
+  final String? sku;
   final bool isActive;
 
   const ProductVariant({
@@ -18,6 +21,9 @@ class ProductVariant {
     required this.sellingPrice,
     this.minimumOrderQuantity = 1,
     this.stockQuantity,
+    this.mrp,
+    this.taxRate,
+    this.sku,
     this.isActive = true,
   });
 
@@ -31,6 +37,9 @@ class ProductVariant {
       sellingPrice: (map['selling_price'] as num?)?.toDouble() ?? 0,
       minimumOrderQuantity: (map['minimum_order_quantity'] as num?)?.toDouble() ?? 1,
       stockQuantity: (map['stock_quantity'] as num?)?.toDouble(),
+      mrp: (map['mrp'] as num?)?.toDouble(),
+      taxRate: (map['tax_rate'] as num?)?.toDouble(),
+      sku: map['sku']?.toString(),
       isActive: map['is_active'] as bool? ?? true,
     );
   }

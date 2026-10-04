@@ -16,7 +16,9 @@ import '../widgets/app_section_header.dart';
 import '../widgets/app_stat_card.dart';
 import '../widgets/app_voice_bottom_nav.dart' show AppNavItem;
 import 'admin_business_list_screen.dart';
+import 'admin_catalog_categories_screen.dart';
 import 'admin_customer_list_screen.dart';
+import 'admin_master_catalog_screen.dart';
 import 'admin_owner_management_screen.dart';
 import 'admin_reports_screen.dart';
 import 'admin_settings_screen.dart';
@@ -184,6 +186,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 padding: EdgeInsets.zero,
                 child: Column(
                   children: [
+                    _ToolTile(
+                      icon: Icons.category_outlined,
+                      label: 'Category Management',
+                      onTap: () => _push(const AdminCatalogCategoriesScreen()),
+                    ),
+                    const Divider(height: 1),
+                    _ToolTile(
+                      icon: Icons.inventory_2_outlined,
+                      label: 'Master Catalog',
+                      onTap: () => _push(const AdminMasterCatalogScreen()),
+                    ),
+                    const Divider(height: 1),
                     _ToolTile(
                       icon: Icons.bar_chart_rounded,
                       label: 'Reports',

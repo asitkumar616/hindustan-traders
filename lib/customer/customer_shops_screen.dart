@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../src/models/cart_line.dart';
+import '../src/screens/login_screen.dart';
 import '../src/services/auth_service.dart';
 import '../src/services/customer_dashboard_service.dart';
 import '../src/services/notification_service.dart';
@@ -17,6 +18,7 @@ import '../src/widgets/app_empty_state.dart';
 import '../src/widgets/app_error_state.dart';
 import '../src/widgets/app_loading_state.dart';
 import '../src/widgets/app_voice_bottom_nav.dart' show AppNavItem;
+import '../src/widgets/ask_assistant_sheet.dart';
 import '../src/widgets/dashboard_bottom_nav.dart';
 import '../src/widgets/dashboard_quick_action_tile.dart';
 import '../src/widgets/notification_bell.dart';
@@ -284,6 +286,16 @@ class _CustomerShopsScreenState extends State<CustomerShopsScreen> {
     Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerProfileScreen()));
   }
 
+  Future<void> _logout() async {
+    await AuthService.signOut();
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
+  }
+
   void _scrollToShops() {
     final ctx = _shopsSectionKey.currentContext;
     if (ctx != null) Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 300));
@@ -301,6 +313,29 @@ class _CustomerShopsScreenState extends State<CustomerShopsScreen> {
       return;
     }
     _pickShop(title: 'Choose a shop to speak your order', onPicked: _openVoiceSheet);
+  }
+
+  void _startAskAssistant() {
+    if (_businesses.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Add a shop first, then you can ask the assistant.')),
+      );
+      return;
+    }
+    if (_businesses.length == 1) {
+      _openAssistantSheet(_businesses.first);
+      return;
+    }
+    _pickShop(title: 'Choose a shop to ask about', onPicked: _openAssistantSheet);
+  }
+
+  void _openAssistantSheet(CustomerBusiness business) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
+      builder: (_) => AskAssistantSheet(businessId: business.businessId),
+    );
   }
 
   void _openVoiceSheet(CustomerBusiness business) {
@@ -353,11 +388,28 @@ class _CustomerShopsScreenState extends State<CustomerShopsScreen> {
                 },
               ),
               ListTile(
+                leading: const Icon(Icons.chat_bubble_outline_rounded, color: AppColors.primary),
+                title: const Text('Ask Assistant'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _startAskAssistant();
+                },
+              ),
+              ListTile(
                 leading: const Icon(Icons.person_outline_rounded, color: AppColors.primary),
                 title: const Text('Profile'),
                 onTap: () {
                   Navigator.pop(sheetContext);
                   _openProfile();
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.logout_rounded, color: AppColors.danger),
+                title: const Text('Logout', style: TextStyle(color: AppColors.danger)),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _logout();
                 },
               ),
             ],
@@ -1049,7 +1101,6 @@ class _ConnectedShopCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(AppRadius.md),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1139,7 +1190,6 @@ class _FrequentlyOrderedCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(AppRadius.md),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

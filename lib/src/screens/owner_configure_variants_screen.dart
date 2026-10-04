@@ -62,22 +62,32 @@ class _VariantRow {
     String? price,
     String? moq,
     String? stock,
+    String? mrp,
+    String? taxRate,
+    String? sku,
     this.enabled = true,
   })  : quantityController = TextEditingController(
           text: quantity == quantity.roundToDouble() ? quantity.toInt().toString() : quantity.toString(),
         ),
         priceController = TextEditingController(text: price ?? ''),
         moqController = TextEditingController(text: moq ?? '1'),
-        stockController = TextEditingController(text: stock ?? '');
+        stockController = TextEditingController(text: stock ?? ''),
+        mrpController = TextEditingController(text: mrp ?? ''),
+        taxRateController = TextEditingController(text: taxRate ?? ''),
+        skuController = TextEditingController(text: sku ?? '');
 
   final String? existingVariantId;
   final String unit;
   final String packageType;
   bool enabled;
+  bool showAdvanced = false;
   final TextEditingController quantityController;
   final TextEditingController priceController;
   final TextEditingController moqController;
   final TextEditingController stockController;
+  final TextEditingController mrpController;
+  final TextEditingController taxRateController;
+  final TextEditingController skuController;
 
   double get quantity => double.tryParse(quantityController.text.trim()) ?? 1;
 
@@ -99,6 +109,9 @@ class _VariantRow {
     priceController.dispose();
     moqController.dispose();
     stockController.dispose();
+    mrpController.dispose();
+    taxRateController.dispose();
+    skuController.dispose();
   }
 }
 
@@ -157,6 +170,9 @@ class _OwnerConfigureVariantsScreenState extends State<OwnerConfigureVariantsScr
               price: v.sellingPrice.toStringAsFixed(0),
               moq: v.minimumOrderQuantity.toStringAsFixed(0),
               stock: v.stockQuantity?.toStringAsFixed(0),
+              mrp: v.mrp?.toStringAsFixed(0),
+              taxRate: v.taxRate?.toStringAsFixed(1),
+              sku: v.sku,
               enabled: v.isActive,
             ))
         .toList();
@@ -319,6 +335,9 @@ class _OwnerConfigureVariantsScreenState extends State<OwnerConfigureVariantsScr
         final price = double.tryParse(row.priceController.text.trim()) ?? 0;
         final moq = double.tryParse(row.moqController.text.trim()) ?? 1;
         final stock = double.tryParse(row.stockController.text.trim());
+        final mrp = double.tryParse(row.mrpController.text.trim());
+        final taxRate = double.tryParse(row.taxRateController.text.trim());
+        final sku = row.skuController.text.trim().isEmpty ? null : row.skuController.text.trim();
 
         if (row.existingVariantId != null) {
           await CustomerBusinessService.updateVariant(
@@ -329,6 +348,9 @@ class _OwnerConfigureVariantsScreenState extends State<OwnerConfigureVariantsScr
             sellingPrice: row.enabled ? price : null,
             minimumOrderQuantity: moq,
             stockQuantity: stock,
+            mrp: mrp,
+            taxRate: taxRate,
+            sku: sku,
             isActive: row.enabled,
             notifyBusinessId: row.enabled ? widget.businessId : null,
             notifyProductName: widget.productName,
@@ -342,8 +364,18 @@ class _OwnerConfigureVariantsScreenState extends State<OwnerConfigureVariantsScr
             sellingPrice: price,
             minimumOrderQuantity: moq,
             stockQuantity: stock,
+            mrp: mrp,
+            taxRate: taxRate,
+            sku: sku,
           );
         }
+      }
+
+      if (!_isEditing) {
+        await CustomerBusinessService.notifyCustomersOfNewProduct(
+          businessId: widget.businessId,
+          productName: widget.productName,
+        );
       }
 
       if (!mounted) return;
@@ -496,6 +528,53 @@ class _OwnerConfigureVariantsScreenState extends State<OwnerConfigureVariantsScr
                                     ),
                                   ],
                                 ),
+                                const SizedBox(height: AppSpacing.xs),
+                                InkWell(
+                                  onTap: () => setState(() => row.showAdvanced = !row.showAdvanced),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 4),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          row.showAdvanced ? 'Hide advanced settings' : 'More settings (MRP, tax, SKU)',
+                                          style: const TextStyle(color: AppColors.ownerPrimary, fontSize: 12, fontWeight: FontWeight.w700),
+                                        ),
+                                        Icon(
+                                          row.showAdvanced ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                                          size: 16,
+                                          color: AppColors.ownerPrimary,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                if (row.showAdvanced) ...[
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextField(
+                                          controller: row.mrpController,
+                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                          decoration: const InputDecoration(labelText: 'MRP (optional)', isDense: true),
+                                        ),
+                                      ),
+                                      const SizedBox(width: AppSpacing.sm),
+                                      Expanded(
+                                        child: TextField(
+                                          controller: row.taxRateController,
+                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                          decoration: const InputDecoration(labelText: 'Tax % (optional)', isDense: true),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: AppSpacing.sm),
+                                  TextField(
+                                    controller: row.skuController,
+                                    decoration: const InputDecoration(labelText: 'SKU (optional)', isDense: true),
+                                  ),
+                                ],
                               ],
                             ],
                           ),

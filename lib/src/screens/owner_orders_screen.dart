@@ -13,6 +13,7 @@ import '../widgets/app_empty_state.dart';
 import '../widgets/app_filter_chip.dart';
 import '../widgets/app_loading_state.dart';
 import '../widgets/app_voice_bottom_nav.dart';
+import '../widgets/ask_assistant_sheet.dart';
 import '../widgets/owner_nav_drawer.dart';
 import '../widgets/voice_order_card.dart';
 import 'login_screen.dart';
@@ -303,6 +304,15 @@ class _OwnerOrdersScreenState extends State<OwnerOrdersScreen> {
         onNavigate: (screen) {
           Navigator.pop(context);
           Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+        },
+        onAskAssistant: () {
+          Navigator.pop(context);
+          showModalBottomSheet<void>(
+            context: context,
+            isScrollControlled: true,
+            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
+            builder: (_) => AskAssistantSheet(businessId: widget.businessId),
+          );
         },
         onLogout: () async {
           Navigator.pop(context);

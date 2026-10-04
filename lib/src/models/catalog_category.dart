@@ -6,12 +6,14 @@ class CatalogCategory {
   final String name;
   final String? parentId;
   final int displayOrder;
+  final bool isActive;
 
   const CatalogCategory({
     required this.id,
     required this.name,
     this.parentId,
     this.displayOrder = 0,
+    this.isActive = true,
   });
 
   factory CatalogCategory.fromMap(Map<String, dynamic> map) {
@@ -20,6 +22,7 @@ class CatalogCategory {
       name: map['name']?.toString() ?? '',
       parentId: map['parent_id']?.toString(),
       displayOrder: (map['display_order'] as num?)?.toInt() ?? 0,
+      isActive: map['is_active'] as bool? ?? true,
     );
   }
 }

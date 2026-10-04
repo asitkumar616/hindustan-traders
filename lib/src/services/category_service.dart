@@ -49,4 +49,51 @@ class CategoryService {
 
     return (response as List).map((row) => CatalogCategory.fromMap(row as Map<String, dynamic>)).toList();
   }
+
+  /// The top-level category ids this business has selected via "What does
+  /// your business sell?" (business_categories). An empty result means the
+  /// business hasn't chosen yet -- callers should fall back to showing
+  /// every category rather than treating it as "sells nothing".
+  static Future<Set<String>> fetchBusinessCategoryIds(String businessId) async {
+    final client = _clientOrNull;
+    if (client == null) return <String>{};
+
+    final response = await client
+        .from('business_categories')
+        .select('category_id')
+        .eq('business_id', businessId)
+        .eq('is_active', true);
+
+    return (response as List).map((row) => (row as Map<String, dynamic>)['category_id'].toString()).toSet();
+  }
+
+  /// Replaces this business's selected categories with [categoryIds] --
+  /// newly checked ones are upserted active, previously-selected ones that
+  /// got unchecked are soft-deactivated (never hard-deleted, consistent
+  /// with how products/variants handle removal elsewhere in the app).
+  static Future<void> saveBusinessCategories(String businessId, Set<String> categoryIds) async {
+    final client = _clientOrNull;
+    if (client == null) return;
+
+    final existing = await fetchBusinessCategoryIds(businessId);
+    final toAdd = categoryIds.difference(existing);
+    final toRemove = existing.difference(categoryIds);
+
+    if (toAdd.isNotEmpty) {
+      await client.from('business_categories').upsert(
+        toAdd
+            .map((id) => {'business_id': businessId, 'category_id': id, 'is_active': true})
+            .toList(),
+        onConflict: 'business_id,category_id',
+      );
+    }
+
+    if (toRemove.isNotEmpty) {
+      await client
+          .from('business_categories')
+          .update({'is_active': false})
+          .eq('business_id', businessId)
+          .inFilter('category_id', toRemove.toList());
+    }
+  }
 }

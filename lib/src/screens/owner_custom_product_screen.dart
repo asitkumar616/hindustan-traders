@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../models/catalog_category.dart';
@@ -6,6 +8,7 @@ import '../models/master_product.dart';
 import '../models/voice_product_draft.dart';
 import '../services/category_service.dart';
 import '../services/customer_business_service.dart';
+import '../services/image_upload_service.dart';
 import '../services/voice_product_parser.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
@@ -13,6 +16,23 @@ import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/app_primary_button.dart';
 import 'owner_configure_variants_screen.dart';
+
+/// One owner-entered "Attribute / Value" pair (e.g. "RAM" / "8GB"), kept
+/// generic rather than hardcoding per-category fields -- stored as JSONB
+/// on the product row.
+class _SpecRow {
+  _SpecRow({String? key, String? value})
+      : keyController = TextEditingController(text: key ?? ''),
+        valueController = TextEditingController(text: value ?? '');
+
+  final TextEditingController keyController;
+  final TextEditingController valueController;
+
+  void dispose() {
+    keyController.dispose();
+    valueController.dispose();
+  }
+}
 
 /// "Add Manually" -- for anything not in the shared master catalog. Creates
 /// a business-scoped product (master_product_id left null) and then hands
@@ -44,6 +64,9 @@ class _OwnerCustomProductScreenState extends State<OwnerCustomProductScreen> {
   late String _baseUnit = _matchBaseUnit(widget.initialDraft?.unit);
   bool _saving = false;
   bool _listening = false;
+  final ImagePicker _imagePicker = ImagePicker();
+  File? _pickedImage;
+  final List<_SpecRow> _specRows = [];
 
   @override
   void initState() {
@@ -83,7 +106,16 @@ class _OwnerCustomProductScreenState extends State<OwnerCustomProductScreen> {
     _nameController.dispose();
     _brandController.dispose();
     _descriptionController.dispose();
+    for (final row in _specRows) {
+      row.dispose();
+    }
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    final picked = await _imagePicker.pickImage(source: ImageSource.gallery, imageQuality: 80, maxWidth: 1600);
+    if (picked == null) return;
+    setState(() => _pickedImage = File(picked.path));
   }
 
   Future<void> _toggleVoiceFill() async {
@@ -135,6 +167,22 @@ class _OwnerCustomProductScreenState extends State<OwnerCustomProductScreen> {
 
     setState(() => _saving = true);
     try {
+      String? imageUrl;
+      final pickedImage = _pickedImage;
+      if (pickedImage != null) {
+        imageUrl = await ImageUploadService.uploadProductImage(
+          businessId: widget.businessId,
+          file: pickedImage,
+        );
+      }
+
+      final specifications = <String, dynamic>{};
+      for (final row in _specRows) {
+        final key = row.keyController.text.trim();
+        final value = row.valueController.text.trim();
+        if (key.isNotEmpty && value.isNotEmpty) specifications[key] = value;
+      }
+
       final created = await CustomerBusinessService.createCustomProduct(
         businessId: widget.businessId,
         name: name,
@@ -143,7 +191,9 @@ class _OwnerCustomProductScreenState extends State<OwnerCustomProductScreen> {
         categoryId: _selectedCategory?.id,
         subcategoryId: _selectedSubcategory?.id,
         brand: _brandController.text.trim().isEmpty ? null : _brandController.text.trim(),
+        imageUrl: imageUrl,
         description: _descriptionController.text.trim().isEmpty ? null : _descriptionController.text.trim(),
+        specifications: specifications.isEmpty ? null : specifications,
       );
       if (!mounted || created == null) return;
 
@@ -193,21 +243,28 @@ class _OwnerCustomProductScreenState extends State<OwnerCustomProductScreen> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 96,
-                  height: 96,
-                  decoration: BoxDecoration(
-                    color: AppColors.ownerPrimary.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                    border: Border.all(color: AppColors.divider),
-                  ),
-                  child: const Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.image_outlined, color: AppColors.ownerPrimary),
-                      SizedBox(height: 4),
-                      Text('Photo', style: AppTextStyles.caption, textAlign: TextAlign.center),
-                    ],
+                InkWell(
+                  onTap: _pickImage,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  child: Container(
+                    width: 96,
+                    height: 96,
+                    clipBehavior: Clip.antiAlias,
+                    decoration: BoxDecoration(
+                      color: AppColors.ownerPrimary.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      border: Border.all(color: AppColors.divider),
+                    ),
+                    child: _pickedImage == null
+                        ? const Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.add_a_photo_outlined, color: AppColors.ownerPrimary),
+                              SizedBox(height: 4),
+                              Text('Add Photo', style: AppTextStyles.caption, textAlign: TextAlign.center),
+                            ],
+                          )
+                        : Image.file(_pickedImage!, fit: BoxFit.cover),
                   ),
                 ),
                 const SizedBox(width: AppSpacing.md),
@@ -228,8 +285,10 @@ class _OwnerCustomProductScreenState extends State<OwnerCustomProductScreen> {
                         ),
                       ),
                       const SizedBox(height: AppSpacing.xs),
-                      const Text(
-                        'Photo shown to customers is chosen automatically from the product name and category.',
+                      Text(
+                        _pickedImage == null
+                            ? 'Tap the photo box to add one, or leave blank to use a category icon.'
+                            : 'Photo selected.',
                         style: AppTextStyles.caption,
                       ),
                     ],
@@ -286,6 +345,50 @@ class _OwnerCustomProductScreenState extends State<OwnerCustomProductScreen> {
                 alignLabelWithHint: true,
               ),
             ),
+            const SizedBox(height: AppSpacing.xl),
+            Row(
+              children: [
+                const Expanded(child: Text('Specifications', style: AppTextStyles.subheading)),
+                TextButton.icon(
+                  onPressed: () => setState(() => _specRows.add(_SpecRow())),
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text('Add'),
+                ),
+              ],
+            ),
+            if (_specRows.isEmpty)
+              const Text(
+                'Optional -- e.g. RAM, Storage, Grade. Not shown during bulk catalog add.',
+                style: AppTextStyles.caption,
+              )
+            else
+              ..._specRows.map((row) => Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: row.keyController,
+                            decoration: const InputDecoration(labelText: 'Attribute', isDense: true),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: TextField(
+                            controller: row.valueController,
+                            decoration: const InputDecoration(labelText: 'Value', isDense: true),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                          onPressed: () => setState(() {
+                            row.dispose();
+                            _specRows.remove(row);
+                          }),
+                        ),
+                      ],
+                    ),
+                  )),
             const SizedBox(height: AppSpacing.xl),
             AppPrimaryButton(
               label: 'Continue to Selling Options',

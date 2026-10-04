@@ -15,6 +15,7 @@ import '../widgets/app_loading_state.dart';
 import '../widgets/app_primary_button.dart';
 import '../widgets/app_secondary_button.dart';
 import '../widgets/app_voice_bottom_nav.dart';
+import '../widgets/ask_assistant_sheet.dart';
 import '../widgets/catalog_product_image.dart';
 import '../widgets/notification_bell.dart';
 import '../widgets/notifications_card.dart';
@@ -637,6 +638,15 @@ class _OwnerProductManagementScreenState extends State<OwnerProductManagementScr
           Navigator.pop(context);
           Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
         },
+        onAskAssistant: () {
+          Navigator.pop(context);
+          showModalBottomSheet<void>(
+            context: context,
+            isScrollControlled: true,
+            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
+            builder: (_) => AskAssistantSheet(businessId: widget.businessId),
+          );
+        },
         onLogout: () async {
           Navigator.pop(context);
           await AuthService.signOut();
@@ -873,7 +883,6 @@ class _SearchField extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(AppRadius.sm),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
       ),
       child: TextField(
         controller: controller,

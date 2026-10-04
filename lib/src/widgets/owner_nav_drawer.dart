@@ -16,12 +16,14 @@ class OwnerNavDrawer extends StatelessWidget {
     required this.businessId,
     required this.onDashboard,
     required this.onNavigate,
+    required this.onAskAssistant,
     required this.onLogout,
   });
 
   final String businessId;
   final VoidCallback onDashboard;
   final void Function(Widget screen) onNavigate;
+  final VoidCallback onAskAssistant;
   final VoidCallback onLogout;
 
   @override
@@ -38,6 +40,11 @@ class OwnerNavDrawer extends StatelessWidget {
               ),
             ),
             ListTile(leading: const Icon(Icons.dashboard_outlined), title: const Text('Dashboard'), onTap: onDashboard),
+            ListTile(
+              leading: const Icon(Icons.mic_none_rounded),
+              title: const Text('Ask Assistant'),
+              onTap: onAskAssistant,
+            ),
             ListTile(
               leading: const Icon(Icons.groups_2_outlined),
               title: const Text('Customers'),
