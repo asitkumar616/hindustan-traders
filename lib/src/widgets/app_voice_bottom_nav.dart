@@ -50,9 +50,8 @@ class AppVoiceBottomNav extends StatelessWidget {
             child: Container(
               height: 64 + bottomInset,
               padding: EdgeInsets.only(bottom: bottomInset),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: Colors.white,
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, -2))],
               ),
               child: Row(
                 children: [
@@ -73,7 +72,6 @@ class AppVoiceBottomNav extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(colors: [accentDark, accentLight]),
-                  boxShadow: [BoxShadow(color: accentDark.withValues(alpha: 0.4), blurRadius: 14, offset: const Offset(0, 6))],
                   border: Border.all(color: Colors.white, width: 3),
                 ),
                 child: const Icon(Icons.mic_rounded, color: Colors.white, size: 26),

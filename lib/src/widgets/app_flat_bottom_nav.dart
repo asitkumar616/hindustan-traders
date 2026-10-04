@@ -21,9 +21,8 @@ class AppFlatBottomNav extends StatelessWidget {
     return Container(
       height: 64 + bottomInset,
       padding: EdgeInsets.only(bottom: bottomInset),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, -2))],
       ),
       child: Row(
         children: items.map((item) => Expanded(child: _FlatNavIcon(item: item, accent: accentColor))).toList(),

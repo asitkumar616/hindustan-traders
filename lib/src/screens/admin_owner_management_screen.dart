@@ -394,7 +394,6 @@ class _AdminOwnerManagementScreenState extends State<AdminOwnerManagementScreen>
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(AppRadius.sm),
-                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
                     ),
                     child: TextField(
                       controller: _searchController,

@@ -68,7 +68,7 @@ class AppTheme {
         actionsIconTheme: IconThemeData(color: colorScheme.onPrimary),
       ),
       cardTheme: CardThemeData(
-        elevation: 1,
+        elevation: 0,
         margin: EdgeInsets.zero,
         color: colorScheme.surface,
         surfaceTintColor: colorScheme.surfaceTint,
