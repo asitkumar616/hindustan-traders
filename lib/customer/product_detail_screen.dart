@@ -6,11 +6,10 @@ import '../src/theme/app_colors.dart';
 import '../src/theme/app_radius.dart';
 import '../src/theme/app_spacing.dart';
 import '../src/theme/app_text_styles.dart';
-import '../src/utils/category_visuals.dart';
 import '../src/utils/formatters.dart';
-import '../src/utils/product_images.dart';
 import '../src/widgets/app_quantity_stepper.dart';
 import '../src/widgets/app_section_header.dart';
+import '../src/widgets/catalog_product_image.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   const ProductDetailScreen({super.key, required this.product});
@@ -80,29 +79,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   children: [
                     Builder(builder: (context) {
                       final category = widget.product['category']?.toString();
-                      final visual = categoryVisual(category);
-                      final imageAsset = productImageAsset(productName: name, category: category);
-                      return ClipRRect(
+                      return CatalogProductImage(
+                        productName: name,
+                        category: category,
+                        imageUrl: widget.product['image_url']?.toString(),
+                        width: double.infinity,
+                        height: 220,
+                        iconSize: 72,
                         borderRadius: BorderRadius.circular(AppRadius.lg),
-                        child: imageAsset == null
-                            ? Container(
-                                width: double.infinity,
-                                height: 220,
-                                color: visual.color.withValues(alpha: 0.08),
-                                child: Icon(visual.icon, color: visual.color, size: 72),
-                              )
-                            : Image.asset(
-                                imageAsset,
-                                width: double.infinity,
-                                height: 220,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) => Container(
-                                  width: double.infinity,
-                                  height: 220,
-                                  color: visual.color.withValues(alpha: 0.08),
-                                  child: Icon(visual.icon, color: visual.color, size: 72),
-                                ),
-                              ),
                       );
                     }),
                     const SizedBox(height: AppSpacing.xl),

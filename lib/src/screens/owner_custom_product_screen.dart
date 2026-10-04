@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import '../models/catalog_category.dart';
 import '../models/master_product.dart';
 import '../models/voice_product_draft.dart';
+import '../services/category_service.dart';
 import '../services/customer_business_service.dart';
 import '../services/voice_product_parser.dart';
 import '../theme/app_colors.dart';
@@ -35,10 +37,39 @@ class _OwnerCustomProductScreenState extends State<OwnerCustomProductScreen> {
   final _brandController = TextEditingController();
   final _descriptionController = TextEditingController();
   final stt.SpeechToText _speech = stt.SpeechToText();
-  String _category = kMasterProductCategories.last;
+  List<CatalogCategory> _categories = const <CatalogCategory>[];
+  List<CatalogCategory> _subcategories = const <CatalogCategory>[];
+  CatalogCategory? _selectedCategory;
+  CatalogCategory? _selectedSubcategory;
   late String _baseUnit = _matchBaseUnit(widget.initialDraft?.unit);
   bool _saving = false;
   bool _listening = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCategories();
+  }
+
+  Future<void> _loadCategories() async {
+    final categories = await CategoryService.fetchTopLevel();
+    if (!mounted) return;
+    setState(() {
+      _categories = categories;
+      _selectedCategory = categories.isEmpty ? null : categories.first;
+    });
+    final selected = _selectedCategory;
+    if (selected != null) _loadSubcategories(selected.id);
+  }
+
+  Future<void> _loadSubcategories(String categoryId) async {
+    final subcategories = await CategoryService.fetchSubcategories(categoryId);
+    if (!mounted) return;
+    setState(() {
+      _subcategories = subcategories;
+      _selectedSubcategory = null;
+    });
+  }
 
   static String _matchBaseUnit(String? spokenUnit) {
     if (spokenUnit == null || spokenUnit.trim().isEmpty) return 'KG';
@@ -108,7 +139,9 @@ class _OwnerCustomProductScreenState extends State<OwnerCustomProductScreen> {
         businessId: widget.businessId,
         name: name,
         baseUnit: _baseUnit,
-        category: _category,
+        category: _selectedCategory?.name,
+        categoryId: _selectedCategory?.id,
+        subcategoryId: _selectedSubcategory?.id,
         brand: _brandController.text.trim().isEmpty ? null : _brandController.text.trim(),
         description: _descriptionController.text.trim().isEmpty ? null : _descriptionController.text.trim(),
       );
@@ -206,11 +239,29 @@ class _OwnerCustomProductScreenState extends State<OwnerCustomProductScreen> {
             ),
             const SizedBox(height: AppSpacing.md),
             DropdownButtonFormField<String>(
-              initialValue: _category,
+              initialValue: _selectedCategory?.id,
               decoration: const InputDecoration(labelText: 'Category *'),
-              items: kMasterProductCategories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-              onChanged: (value) => setState(() => _category = value ?? _category),
+              items: _categories.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(),
+              onChanged: (value) {
+                final matches = _categories.where((c) => c.id == value);
+                if (matches.isEmpty) return;
+                final category = matches.first;
+                setState(() => _selectedCategory = category);
+                _loadSubcategories(category.id);
+              },
             ),
+            if (_subcategories.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.md),
+              DropdownButtonFormField<String>(
+                initialValue: _selectedSubcategory?.id,
+                decoration: const InputDecoration(labelText: 'Subcategory (Optional)'),
+                items: _subcategories.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(),
+                onChanged: (value) {
+                  final matches = _subcategories.where((c) => c.id == value);
+                  setState(() => _selectedSubcategory = matches.isEmpty ? null : matches.first);
+                },
+              ),
+            ],
             const SizedBox(height: AppSpacing.md),
             TextField(
               controller: _brandController,

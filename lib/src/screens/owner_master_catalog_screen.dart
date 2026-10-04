@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
+import '../models/catalog_category.dart';
 import '../models/master_product.dart';
+import '../services/category_service.dart';
 import '../services/customer_business_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
-import '../utils/product_images.dart';
 import '../widgets/app_card.dart';
 import '../widgets/app_empty_state.dart';
 import '../widgets/app_filter_chip.dart';
 import '../widgets/app_loading_state.dart';
 import '../widgets/app_primary_button.dart';
+import '../widgets/catalog_product_image.dart';
 import 'owner_configure_variants_screen.dart';
 import 'owner_custom_product_screen.dart';
 
@@ -33,13 +35,21 @@ class _OwnerMasterCatalogScreenState extends State<OwnerMasterCatalogScreen> {
   String _category = 'All';
   bool _loading = true;
   List<MasterProduct> _products = const <MasterProduct>[];
+  List<CatalogCategory> _categories = const <CatalogCategory>[];
   bool _adding = false;
 
   @override
   void initState() {
     super.initState();
+    _loadCategories();
     _load();
     _searchController.addListener(() => setState(() {}));
+  }
+
+  Future<void> _loadCategories() async {
+    final categories = await CategoryService.fetchTopLevel();
+    if (!mounted) return;
+    setState(() => _categories = categories);
   }
 
   @override
@@ -249,7 +259,7 @@ class _OwnerMasterCatalogScreenState extends State<OwnerMasterCatalogScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final categories = ['All', ...kMasterProductCategories];
+    final categories = ['All', ..._categories.map((c) => c.name)];
 
     return Scaffold(
       backgroundColor: AppColors.surfaceMuted,
@@ -332,36 +342,17 @@ class _OwnerMasterCatalogScreenState extends State<OwnerMasterCatalogScreen> {
                           itemCount: _products.length,
                           itemBuilder: (context, index) {
                             final product = _products[index];
-                            final imageAsset = productImageAsset(
-                              productName: product.productName,
-                              category: product.category,
-                            );
                             return Padding(
                               padding: const EdgeInsets.only(bottom: AppSpacing.md),
                               child: AppCard(
                                 child: Row(
                                   children: [
-                                    ClipRRect(
+                                    CatalogProductImage(
+                                      productName: product.productName,
+                                      category: product.category,
+                                      imageUrl: product.imageUrl,
+                                      size: 72,
                                       borderRadius: BorderRadius.circular(AppRadius.sm),
-                                      child: imageAsset == null
-                                          ? Container(
-                                              width: 72,
-                                              height: 72,
-                                              color: AppColors.ownerPrimary.withValues(alpha: 0.1),
-                                              child: const Icon(Icons.inventory_2_outlined, color: AppColors.ownerPrimary),
-                                            )
-                                          : Image.asset(
-                                              imageAsset,
-                                              width: 72,
-                                              height: 72,
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (context, error, stackTrace) => Container(
-                                                width: 72,
-                                                height: 72,
-                                                color: AppColors.ownerPrimary.withValues(alpha: 0.1),
-                                                child: const Icon(Icons.inventory_2_outlined, color: AppColors.ownerPrimary),
-                                              ),
-                                            ),
                                     ),
                                     const SizedBox(width: AppSpacing.md),
                                     Expanded(

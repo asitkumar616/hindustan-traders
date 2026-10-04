@@ -10,15 +10,14 @@ import '../src/theme/app_colors.dart';
 import '../src/theme/app_radius.dart';
 import '../src/theme/app_spacing.dart';
 import '../src/theme/app_text_styles.dart';
-import '../src/utils/category_visuals.dart';
 import '../src/utils/formatters.dart';
-import '../src/utils/product_images.dart';
 import '../src/widgets/app_card.dart';
 import '../src/widgets/app_empty_state.dart';
 import '../src/widgets/app_filter_chip.dart';
 import '../src/widgets/app_loading_state.dart';
 import '../src/widgets/app_quantity_stepper.dart';
 import '../src/widgets/app_voice_bottom_nav.dart';
+import '../src/widgets/catalog_product_image.dart';
 import '../src/widgets/draft_history_card.dart';
 import '../src/widgets/notification_bell.dart';
 import '../src/widgets/notifications_card.dart';
@@ -398,35 +397,18 @@ class _ProductCard extends StatelessWidget {
     final defaultVariant = variants.isNotEmpty ? variants.first : null;
     final quantity = defaultVariant != null ? cart.quantityFor(defaultVariant.id) : 0.0;
     final category = product['category']?.toString();
-    final visual = categoryVisual(category);
-    final imageAsset = productImageAsset(productName: name, category: category);
 
     return AppCard(
       onTap: onTap,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ClipRRect(
+          CatalogProductImage(
+            productName: name,
+            category: category,
+            imageUrl: product['image_url']?.toString(),
+            size: 88,
             borderRadius: BorderRadius.circular(AppRadius.sm),
-            child: imageAsset == null
-                ? Container(
-                    width: 88,
-                    height: 88,
-                    decoration: BoxDecoration(color: visual.color.withValues(alpha: 0.1)),
-                    child: Icon(visual.icon, color: visual.color, size: 36),
-                  )
-                : Image.asset(
-                    imageAsset,
-                    width: 88,
-                    height: 88,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      width: 88,
-                      height: 88,
-                      decoration: BoxDecoration(color: visual.color.withValues(alpha: 0.1)),
-                      child: Icon(visual.icon, color: visual.color, size: 36),
-                    ),
-                  ),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(

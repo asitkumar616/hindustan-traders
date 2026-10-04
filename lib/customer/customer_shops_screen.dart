@@ -11,13 +11,14 @@ import '../src/theme/app_spacing.dart';
 import '../src/theme/app_text_styles.dart';
 import '../src/utils/category_visuals.dart';
 import '../src/utils/formatters.dart';
+import '../src/utils/product_images.dart';
 import '../src/widgets/app_card.dart';
 import '../src/widgets/app_empty_state.dart';
 import '../src/widgets/app_error_state.dart';
 import '../src/widgets/app_loading_state.dart';
-import '../src/widgets/app_quick_action_tile.dart';
-import '../src/widgets/app_section_header.dart';
-import '../src/widgets/app_voice_bottom_nav.dart';
+import '../src/widgets/app_voice_bottom_nav.dart' show AppNavItem;
+import '../src/widgets/dashboard_bottom_nav.dart';
+import '../src/widgets/dashboard_quick_action_tile.dart';
 import '../src/widgets/notification_bell.dart';
 import '../src/widgets/voice_order_card.dart';
 import 'customer_home_screen.dart';
@@ -112,7 +113,7 @@ class _CustomerShopsScreenState extends State<CustomerShopsScreen> {
   }
 
   /// Shared "which shop?" prompt for any dashboard action that needs exactly
-  /// one business before it can proceed (Start Shopping, a category tap, an
+  /// one business before it can proceed (Shop Products, a category tap, an
   /// Add-to-cart) -- skips the prompt when there's only one connected shop.
   void _pickShop({required String title, required void Function(CustomerBusiness business) onPicked}) {
     if (_businesses.isEmpty) {
@@ -330,6 +331,42 @@ class _CustomerShopsScreenState extends State<CustomerShopsScreen> {
     );
   }
 
+  /// Bottom-nav "More" entry point -- keeps Voice Order and Profile/Logout
+  /// reachable without putting a floating mic over this dashboard's
+  /// approved layout.
+  void _showMoreMenu() {
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.mic_rounded, color: AppColors.primary),
+                title: const Text('Voice Order'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _startVoiceOrder();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.person_outline_rounded, color: AppColors.primary),
+                title: const Text('Profile'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _openProfile();
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final greetingName = _customerName?.isNotEmpty == true ? _customerName! : 'there';
@@ -342,29 +379,12 @@ class _CustomerShopsScreenState extends State<CustomerShopsScreen> {
         child: RefreshIndicator(
           onRefresh: _load,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.sm, AppSpacing.xl, AppSpacing.xxl),
+            padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.xxl),
             children: [
-              Row(
-                children: [
-                  const Icon(Icons.shopping_cart_rounded, color: AppColors.categoryDal, size: 26),
-                  const SizedBox(width: AppSpacing.xs),
-                  RichText(
-                    text: const TextSpan(
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-                      children: [
-                        TextSpan(text: 'Odia', style: TextStyle(color: AppColors.textPrimary)),
-                        TextSpan(text: 'Mandi', style: TextStyle(color: AppColors.primary)),
-                      ],
-                    ),
-                  ),
-                  const Spacer(),
-                  NotificationBell(
-                    businessIds: _businesses.map((b) => b.businessId).toList(),
-                    onTap: _showNotifications,
-                  ),
-                ],
+              _DashboardHeader(
+                businessIds: _businesses.map((b) => b.businessId).toList(),
+                onNotificationsTap: _showNotifications,
               ),
-              const Text('Wholesale Made Simple', style: AppTextStyles.caption),
               if (_loadError != null) ...[
                 const SizedBox(height: AppSpacing.md),
                 AppErrorState(
@@ -373,7 +393,7 @@ class _CustomerShopsScreenState extends State<CustomerShopsScreen> {
                 ),
               ],
               const SizedBox(height: AppSpacing.lg),
-              _GreetingBanner(greeting: _greeting, name: greetingName),
+              _GreetingCard(greeting: _greeting, name: greetingName),
               if (!_loading && _businesses.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.lg),
                 _CustomerStatsGrid(
@@ -385,58 +405,56 @@ class _CustomerShopsScreenState extends State<CustomerShopsScreen> {
                   onTapPendingCod: _openOrders,
                 ),
               ],
-              const SizedBox(height: AppSpacing.xl),
-              const Text('QUICK ACTIONS', style: AppTextStyles.sectionLabel),
-              const SizedBox(height: AppSpacing.md),
-              GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisSpacing: AppSpacing.md,
-                mainAxisSpacing: AppSpacing.md,
-                childAspectRatio: 1.5,
+              const SizedBox(height: AppSpacing.lg),
+              const Text('Quick Actions', style: AppTextStyles.subheading),
+              const SizedBox(height: AppSpacing.sm),
+              Row(
                 children: [
-                  AppQuickActionTile(
-                    icon: Icons.storefront_outlined,
-                    label: 'Start Shopping',
-                    accentColor: AppColors.primary,
-                    onTap: _startShopping,
+                  Expanded(
+                    child: DashboardQuickActionTile(
+                      icon: Icons.storefront_outlined,
+                      label: 'Shop Products',
+                      accentColor: AppColors.categoryDal,
+                      onTap: _startShopping,
+                    ),
                   ),
-                  AppQuickActionTile(
-                    icon: Icons.receipt_long_outlined,
-                    label: 'My Orders',
-                    accentColor: AppColors.navy,
-                    onTap: _openOrders,
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: DashboardQuickActionTile(
+                      icon: Icons.receipt_long_outlined,
+                      label: 'My Orders',
+                      accentColor: AppColors.danger,
+                      onTap: _openOrders,
+                    ),
                   ),
-                  AppQuickActionTile(
-                    icon: Icons.payments_outlined,
-                    label: 'Payments',
-                    accentColor: AppColors.success,
-                    onTap: _openOrders,
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: DashboardQuickActionTile(
+                      icon: Icons.payments_outlined,
+                      label: 'Payments',
+                      accentColor: AppColors.info,
+                      onTap: _openOrders,
+                    ),
                   ),
-                  AppQuickActionTile(
-                    icon: Icons.description_outlined,
-                    label: 'Invoices',
-                    accentColor: AppColors.categoryDal,
-                    onTap: _openOrders,
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: DashboardQuickActionTile(
+                      icon: Icons.description_outlined,
+                      label: 'Invoices',
+                      accentColor: AppColors.success,
+                      onTap: _openOrders,
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: AppSpacing.xl),
-              _PromoBanner(
-                title: 'Best Prices on Daily Essentials',
-                subtitle: 'Rice, Dal, Oil, Atta and more from your trusted shops.',
-                buttonLabel: 'Shop Now',
-                icon: Icons.storefront_rounded,
-                colors: const [AppColors.primary, AppColors.primaryLight],
-                onTap: _startShopping,
-              ),
-              const SizedBox(height: AppSpacing.xl),
+              const SizedBox(height: AppSpacing.lg),
+              _DailyEssentialsBanner(onTap: _startShopping),
+              const SizedBox(height: AppSpacing.lg),
               KeyedSubtree(
                 key: _shopsSectionKey,
-                child: AppSectionHeader(title: 'Connected Shops', actionLabel: _businesses.isEmpty ? null : 'View All', onAction: _scrollToShops),
+                child: _SectionHeader(title: 'Connected Shops', actionLabel: _businesses.isEmpty ? null : 'View All', onAction: _scrollToShops),
               ),
-              const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpacing.sm),
               if (_loading)
                 const AppLoadingState()
               else if (_businesses.isEmpty && _loadError == null)
@@ -446,10 +464,16 @@ class _CustomerShopsScreenState extends State<CustomerShopsScreen> {
                   message: 'Ask a shop owner to add your mobile number as a customer to get started.',
                 )
               else
-                ..._businesses.map(
-                  (business) => Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                    child: _ShopCard(business: business, onTap: () => _openShop(business)),
+                SizedBox(
+                  height: 110,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _businesses.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
+                    itemBuilder: (context, index) => _ConnectedShopCard(
+                      business: _businesses[index],
+                      onTap: () => _openShop(_businesses[index]),
+                    ),
                   ),
                 ),
               const SizedBox(height: AppSpacing.sm),
@@ -459,9 +483,9 @@ class _CustomerShopsScreenState extends State<CustomerShopsScreen> {
                 label: const Text('Add / Request New Shop'),
               ),
               if (!_loading) ...[
-                const SizedBox(height: AppSpacing.xl),
-                AppSectionHeader(title: 'Recent Orders', actionLabel: recentOrders.isEmpty ? null : 'View All', onAction: _openOrders),
-                const SizedBox(height: AppSpacing.md),
+                const SizedBox(height: AppSpacing.lg),
+                _SectionHeader(title: 'Recent Orders', actionLabel: recentOrders.isEmpty ? null : 'View All', onAction: _openOrders),
+                const SizedBox(height: AppSpacing.sm),
                 if (recentOrders.isEmpty)
                   const AppEmptyState(
                     icon: Icons.receipt_long_outlined,
@@ -469,21 +493,22 @@ class _CustomerShopsScreenState extends State<CustomerShopsScreen> {
                     message: 'Start shopping to place your first order.',
                   )
                 else
-                  ...recentOrders.map(
-                    (order) => Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                  ...recentOrders.asMap().entries.map(
+                    (entry) => Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                       child: _RecentOrderCard(
-                        order: order,
-                        businessName: _businessById(order['business_id']?.toString() ?? '')?.businessName ?? 'Shop',
-                        onReorder: order['status'] == 'completed' ? () => _reorder(order) : null,
+                        order: entry.value,
+                        avatarIndex: entry.key,
+                        businessName: _businessById(entry.value['business_id']?.toString() ?? '')?.businessName ?? 'Shop',
+                        onTap: entry.value['status'] == 'completed' ? () => _reorder(entry.value) : _openOrders,
                       ),
                     ),
                   ),
               ],
               if (!_loading && _categories.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.xl),
-                const AppSectionHeader(title: 'Shop by Category'),
-                const SizedBox(height: AppSpacing.md),
+                const SizedBox(height: AppSpacing.lg),
+                const _SectionHeader(title: 'Shop by Category'),
+                const SizedBox(height: AppSpacing.sm),
                 SizedBox(
                   height: 84,
                   child: ListView.separated(
@@ -498,11 +523,11 @@ class _CustomerShopsScreenState extends State<CustomerShopsScreen> {
                 ),
               ],
               if (!_loading && _frequentlyOrdered.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.xl),
-                const AppSectionHeader(title: 'Frequently Ordered'),
-                const SizedBox(height: AppSpacing.md),
+                const SizedBox(height: AppSpacing.lg),
+                const _SectionHeader(title: 'Frequently Ordered'),
+                const SizedBox(height: AppSpacing.sm),
                 SizedBox(
-                  height: 168,
+                  height: 190,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     itemCount: _frequentlyOrdered.length,
@@ -514,31 +539,20 @@ class _CustomerShopsScreenState extends State<CustomerShopsScreen> {
                   ),
                 ),
               ],
-              const SizedBox(height: AppSpacing.xl),
-              _PromoBanner(
-                title: 'Explore More Shops',
-                subtitle: 'Get connected with more trusted wholesale shops.',
-                buttonLabel: 'Add Shop',
-                icon: Icons.add_business_rounded,
-                colors: const [AppColors.categoryDal, AppColors.navyLight],
-                onTap: _requestNewShop,
-              ),
+              const SizedBox(height: AppSpacing.lg),
+              _ExploreShopsBanner(onTap: _requestNewShop),
             ],
           ),
         ),
       ),
-      bottomNavigationBar: AppVoiceBottomNav(
-        accentDark: AppColors.primary,
-        accentLight: AppColors.primaryLight,
-        leftItems: [
+      bottomNavigationBar: DashboardBottomNav(
+        items: [
           const AppNavItem(icon: Icons.home_rounded, label: 'Home', active: true),
           AppNavItem(icon: Icons.storefront_outlined, label: 'Shops', onTap: _scrollToShops),
-        ],
-        rightItems: [
           AppNavItem(icon: Icons.receipt_long_outlined, label: 'Orders', onTap: _openOrders),
-          AppNavItem(icon: Icons.person_outline_rounded, label: 'Profile', onTap: _openProfile),
+          AppNavItem(icon: Icons.shopping_cart_outlined, label: 'Cart', onTap: _startShopping),
+          AppNavItem(icon: Icons.more_horiz_rounded, label: 'More', onTap: _showMoreMenu),
         ],
-        onVoice: _startVoiceOrder,
       ),
     );
   }
@@ -611,8 +625,48 @@ int? _percentDelta(num current, num previous) {
   return (((current - previous) / previous) * 100).round();
 }
 
-class _GreetingBanner extends StatelessWidget {
-  const _GreetingBanner({required this.greeting, required this.name});
+/// Header row: brand mark + tagline on the left, notification bell on the
+/// right. Deliberately no hamburger/business-selector/profile info here --
+/// this dashboard has no single "current business" the way the Owner
+/// dashboard does, and the approved mockup keeps this header minimal.
+class _DashboardHeader extends StatelessWidget {
+  const _DashboardHeader({required this.businessIds, required this.onNotificationsTap});
+
+  final List<String> businessIds;
+  final Future<void> Function() onNotificationsTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Image.asset('assets/images/branding/logo.png', width: 28, height: 28, fit: BoxFit.contain),
+        const SizedBox(width: AppSpacing.sm),
+        const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'OdiaTraders',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary, height: 1.1),
+            ),
+            Text(
+              'Wholesale Made Simple',
+              style: TextStyle(fontSize: 9, color: AppColors.textSecondary, height: 1.2),
+            ),
+          ],
+        ),
+        const Spacer(),
+        NotificationBell(businessIds: businessIds, onTap: onNotificationsTap),
+      ],
+    );
+  }
+}
+
+/// Compact cream greeting banner, matching the Owner dashboard's treatment
+/// instead of a large saturated gradient.
+class _GreetingCard extends StatelessWidget {
+  const _GreetingCard({required this.greeting, required this.name});
 
   final String greeting;
   final String name;
@@ -621,47 +675,65 @@ class _GreetingBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 14),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.primary, AppColors.primaryLight],
-        ),
+        color: const Color(0xFFFFF1E0),
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: [
-          BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 16, offset: const Offset(0, 8)),
-        ],
       ),
       child: Row(
         children: [
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text('$greeting,', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+                Text('$greeting,', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                 Text(
                   '$name!',
-                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
+                  style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 const Text(
-                  "Here's what's happening with your shops today.",
-                  style: TextStyle(color: Colors.white, fontSize: 12.5),
+                  'Fresh products. Better prices. Always.',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  maxLines: 2,
                 ),
               ],
             ),
           ),
           const SizedBox(width: AppSpacing.md),
           Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), shape: BoxShape.circle),
-            child: const Icon(Icons.shopping_basket_rounded, color: Colors.white, size: 26),
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.14), shape: BoxShape.circle),
+            child: const Icon(Icons.shopping_basket_rounded, color: AppColors.primary, size: 24),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Plain section-header row -- title in the same subheading style used
+/// throughout the Owner dashboard, with an optional "View All" action.
+/// Deliberately not [AppSectionHeader] (which renders small-caps labels);
+/// the approved mockup uses normal-case bold headings here.
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title, this.actionLabel, this.onAction});
+
+  final String title;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(title, style: AppTextStyles.subheading),
+        if (actionLabel != null) TextButton(onPressed: onAction, child: Text(actionLabel!)),
+      ],
     );
   }
 }
@@ -687,49 +759,51 @@ class _CustomerStatsGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final trend = _percentDelta(stats.thisMonthTotal, stats.lastMonthTotal);
 
+    final items = [
+      _StatTile(
+        icon: Icons.storefront_rounded,
+        bg: AppColors.categoryDal.withValues(alpha: 0.12),
+        fg: AppColors.categoryDal,
+        label: 'My Shops',
+        value: shopCount.toString(),
+        onTap: onTapShops,
+      ),
+      _StatTile(
+        icon: Icons.inventory_2_rounded,
+        bg: AppColors.statPendingBg,
+        fg: AppColors.statPendingFg,
+        label: 'Active Orders',
+        value: stats.activeOrders.toString(),
+        onTap: onTapActiveOrders,
+      ),
+      _StatTile(
+        icon: Icons.currency_rupee_rounded,
+        bg: const Color(0xFFE1F7E8),
+        fg: AppColors.success,
+        label: 'This Month Purchases',
+        value: '₹${formatIndianAmount(stats.thisMonthTotal)}',
+        deltaPercent: trend,
+        onTap: onTapThisMonth,
+      ),
+      _StatTile(
+        icon: Icons.local_shipping_outlined,
+        bg: AppColors.statAmountBg,
+        fg: AppColors.statAmountFg,
+        label: 'Pending COD',
+        value: stats.pendingCodCount.toString(),
+        subValue: '₹${formatIndianAmount(stats.pendingCodAmount)}',
+        onTap: onTapPendingCod,
+      ),
+    ];
+
     return GridView.count(
       crossAxisCount: 2,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: AppSpacing.md,
-      mainAxisSpacing: AppSpacing.md,
-      childAspectRatio: 1.35,
-      children: [
-        _StatTile(
-          icon: Icons.storefront_rounded,
-          bg: AppColors.categoryDal.withValues(alpha: 0.12),
-          fg: AppColors.categoryDal,
-          label: 'My Shops',
-          value: shopCount.toString(),
-          onTap: onTapShops,
-        ),
-        _StatTile(
-          icon: Icons.inventory_2_rounded,
-          bg: AppColors.statPendingBg,
-          fg: AppColors.statPendingFg,
-          label: 'Active Orders',
-          value: stats.activeOrders.toString(),
-          onTap: onTapActiveOrders,
-        ),
-        _StatTile(
-          icon: Icons.currency_rupee_rounded,
-          bg: const Color(0xFFE1F7E8),
-          fg: AppColors.success,
-          label: 'This Month Purchases',
-          value: '₹${formatIndianAmount(stats.thisMonthTotal)}',
-          deltaPercent: trend,
-          onTap: onTapThisMonth,
-        ),
-        _StatTile(
-          icon: Icons.local_shipping_outlined,
-          bg: AppColors.statAmountBg,
-          fg: AppColors.statAmountFg,
-          label: 'Pending COD',
-          value: stats.pendingCodCount.toString(),
-          subValue: '₹${formatIndianAmount(stats.pendingCodAmount)}',
-          onTap: onTapPendingCod,
-        ),
-      ],
+      crossAxisSpacing: AppSpacing.sm,
+      mainAxisSpacing: AppSpacing.sm,
+      childAspectRatio: 1.7,
+      children: items,
     );
   }
 }
@@ -759,29 +833,48 @@ class _StatTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppCard(
       onTap: onTap,
-      child: Column(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-                child: Icon(icon, size: 18, color: fg),
-              ),
-              if (deltaPercent != null) _DeltaChip(percent: deltaPercent!),
-            ],
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+            alignment: Alignment.center,
+            child: Icon(icon, size: 18, color: fg),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-          const SizedBox(height: 2),
-          Text(
-            subValue == null ? label : '$label · $subValue',
-            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-            overflow: TextOverflow.ellipsis,
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w500, color: AppColors.textSecondary, height: 1.15),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  value,
+                  style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (deltaPercent != null) ...[
+                  const SizedBox(height: 2),
+                  _DeltaCaption(percent: deltaPercent!),
+                ] else if (subValue != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subValue!,
+                    style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondary),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ],
+            ),
           ),
         ],
       ),
@@ -789,43 +882,44 @@ class _StatTile extends StatelessWidget {
   }
 }
 
-class _DeltaChip extends StatelessWidget {
-  const _DeltaChip({required this.percent});
+class _DeltaCaption extends StatelessWidget {
+  const _DeltaCaption({required this.percent});
 
   final int percent;
 
   @override
   Widget build(BuildContext context) {
     if (percent == 0) {
-      return const Text('0%', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textSecondary));
+      return const Text(
+        'No change · vs last month',
+        style: TextStyle(fontSize: 10.5, color: AppColors.textSecondary),
+        overflow: TextOverflow.ellipsis,
+      );
     }
     final isUp = percent > 0;
     final color = isUp ? AppColors.success : AppColors.danger;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(isUp ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, size: 12, color: color),
-        Text('${percent.abs()}%', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+        Icon(isUp ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, size: 11, color: color),
+        Flexible(
+          child: Text(
+            '${percent.abs()}% vs last month',
+            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: color),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
       ],
     );
   }
 }
 
-class _PromoBanner extends StatelessWidget {
-  const _PromoBanner({
-    required this.title,
-    required this.subtitle,
-    required this.buttonLabel,
-    required this.icon,
-    required this.colors,
-    required this.onTap,
-  });
+/// Cream promo banner driving the customer into the shopping flow --
+/// visually matches the greeting card's quieter palette rather than a
+/// saturated gradient.
+class _DailyEssentialsBanner extends StatelessWidget {
+  const _DailyEssentialsBanner({required this.onTap});
 
-  final String title;
-  final String subtitle;
-  final String buttonLabel;
-  final IconData icon;
-  final List<Color> colors;
   final VoidCallback onTap;
 
   @override
@@ -834,7 +928,7 @@ class _PromoBanner extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: colors),
+        color: const Color(0xFFFFF1E0),
         borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       child: Row(
@@ -842,34 +936,39 @@ class _PromoBanner extends StatelessWidget {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
+                const Text(
+                  'Best Prices on Daily Essentials',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                ),
                 const SizedBox(height: 2),
-                Text(subtitle, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                const Text(
+                  'Rice, Dal, Oil, Atta and more from your trusted shops',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                ),
                 const SizedBox(height: AppSpacing.sm),
-                OutlinedButton(
+                ElevatedButton(
                   onPressed: onTap,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.white70),
-                  ),
-                  child: Row(
+                  style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10)),
+                  child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(buttonLabel),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.arrow_forward_rounded, size: 16),
+                      Text('Shop Now'),
+                      SizedBox(width: 4),
+                      Icon(Icons.arrow_forward_rounded, size: 16),
                     ],
                   ),
                 ),
               ],
             ),
           ),
+          const SizedBox(width: AppSpacing.sm),
           Container(
             width: 48,
             height: 48,
-            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), shape: BoxShape.circle),
-            child: Icon(icon, color: Colors.white, size: 24),
+            decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.14), shape: BoxShape.circle),
+            child: const Icon(Icons.shopping_basket_rounded, color: AppColors.primary, size: 24),
           ),
         ],
       ),
@@ -877,45 +976,101 @@ class _PromoBanner extends StatelessWidget {
   }
 }
 
-class _ShopCard extends StatelessWidget {
-  const _ShopCard({required this.business, required this.onTap});
+/// Light-lavender banner nudging the customer to connect more shops --
+/// visually distinct from the cream Daily Essentials banner above it.
+class _ExploreShopsBanner extends StatelessWidget {
+  const _ExploreShopsBanner({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: AppColors.categoryDal.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      child: Row(
+        children: [
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Explore More Shops',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Get connected with more trusted wholesale shops.',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(999),
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: const BoxDecoration(color: AppColors.categoryDal, shape: BoxShape.circle),
+              child: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 22),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Horizontal shop card. Only a name and a placeholder storefront icon are
+/// shown -- the backend has no shop photo or rating field yet, so neither
+/// is fabricated here.
+class _ConnectedShopCard extends StatelessWidget {
+  const _ConnectedShopCard({required this.business, required this.onTap});
 
   final CustomerBusiness business;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      onTap: onTap,
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(14)),
-            child: const Icon(Icons.storefront_rounded, color: AppColors.primary),
+    return SizedBox(
+      width: 128,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
           ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(business.businessName, style: AppTextStyles.subheading),
-                if (business.customerDisplayName?.isNotEmpty == true) ...[
-                  const SizedBox(height: 2),
-                  Text(business.customerDisplayName!, style: AppTextStyles.bodyMuted),
-                ],
-              ],
-            ),
-          ),
-          const Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Shop Now', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
-              Icon(Icons.arrow_forward_rounded, size: 18, color: AppColors.primary),
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
+                child: const Icon(Icons.storefront_rounded, color: AppColors.primary, size: 20),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                business.businessName,
+                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -975,10 +1130,12 @@ class _FrequentlyOrderedCard extends StatelessWidget {
         ? unit
         : '${qty == qty.roundToDouble() ? qty.toInt() : qty} $unit${(packageType != null && packageType != 'LOOSE') ? ' $packageType' : ''}';
     final price = (item['current_price'] as num?) ?? 0;
+    final visual = categoryVisual(null);
+    final imageAsset = productImageAsset(productName: name);
 
     return Container(
-      width: 140,
-      padding: const EdgeInsets.all(AppSpacing.md),
+      width: 136,
+      padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(AppRadius.md),
@@ -987,19 +1144,49 @@ class _FrequentlyOrderedCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(name, style: AppTextStyles.subheading, maxLines: 1, overflow: TextOverflow.ellipsis),
-          if (brand != null && brand.isNotEmpty) Text(brand, style: AppTextStyles.caption, maxLines: 1, overflow: TextOverflow.ellipsis),
-          const SizedBox(height: 2),
-          Text(variantLabel, style: AppTextStyles.caption, maxLines: 1, overflow: TextOverflow.ellipsis),
-          const Spacer(),
-          Text('₹${formatIndianAmount(price)}', style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            child: imageAsset == null
+                ? Container(
+                    width: double.infinity,
+                    height: 72,
+                    color: visual.color.withValues(alpha: 0.1),
+                    child: Icon(visual.icon, color: visual.color, size: 30),
+                  )
+                : Image.asset(
+                    imageAsset,
+                    width: double.infinity,
+                    height: 72,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      width: double.infinity,
+                      height: 72,
+                      color: visual.color.withValues(alpha: 0.1),
+                      child: Icon(visual.icon, color: visual.color, size: 30),
+                    ),
+                  ),
+          ),
           const SizedBox(height: AppSpacing.sm),
+          Text(name, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
+          if (brand != null && brand.isNotEmpty)
+            Text(brand, style: AppTextStyles.caption, maxLines: 1, overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 2),
+          Text(variantLabel, style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondary), maxLines: 1, overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 4),
+          Text('₹${formatIndianAmount(price)}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5, color: AppColors.textPrimary)),
+          const SizedBox(height: AppSpacing.xs),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(
+            child: TextButton.icon(
               onPressed: onAdd,
-              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 8)),
-              child: const Text('Add'),
+              icon: const Icon(Icons.shopping_cart_rounded, size: 15, color: AppColors.primary),
+              label: const Text('Add'),
+              style: TextButton.styleFrom(
+                backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                foregroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+              ),
             ),
           ),
         ],
@@ -1009,11 +1196,14 @@ class _FrequentlyOrderedCard extends StatelessWidget {
 }
 
 class _RecentOrderCard extends StatelessWidget {
-  const _RecentOrderCard({required this.order, required this.businessName, this.onReorder});
+  const _RecentOrderCard({required this.order, required this.avatarIndex, required this.businessName, required this.onTap});
 
   final Map<String, dynamic> order;
+  final int avatarIndex;
   final String businessName;
-  final VoidCallback? onReorder;
+  final VoidCallback onTap;
+
+  static const _avatarColors = [AppColors.info, AppColors.success, AppColors.primary, AppColors.categoryDal];
 
   @override
   Widget build(BuildContext context) {
@@ -1025,34 +1215,41 @@ class _RecentOrderCard extends StatelessWidget {
     final created = createdRaw == null ? null : DateTime.tryParse(createdRaw)?.toLocal();
     final dateLabel = created == null ? '' : DateFormat('d MMM yyyy').format(created);
     final paymentBadge = _paymentBadge(order);
+    final avatarColor = _avatarColors[avatarIndex % _avatarColors.length];
 
     return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      onTap: onTap,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Row(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(orderRef, style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-                    const SizedBox(height: 2),
-                    Text(businessName, style: AppTextStyles.bodyMuted),
-                  ],
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(color: avatarColor.withValues(alpha: 0.15), shape: BoxShape.circle),
+            alignment: Alignment.center,
+            child: Icon(Icons.receipt_long_rounded, color: avatarColor, size: 17),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(orderRef, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: AppColors.textPrimary)),
+                const SizedBox(height: 2),
+                Text(businessName, style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary), maxLines: 1, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 1),
+                Text(
+                  '$dateLabel${dateLabel.isEmpty ? '' : ' · '}$itemCount item${itemCount == 1 ? '' : 's'}',
+                  style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondary),
                 ),
-              ),
-              Text('₹${formatIndianAmount(amount)}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.textPrimary)),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            '$dateLabel${dateLabel.isEmpty ? '' : ' · '}$itemCount item${itemCount == 1 ? '' : 's'}',
-            style: AppTextStyles.caption,
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
+              Text('₹${formatIndianAmount(amount)}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textPrimary)),
+              const SizedBox(height: 4),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(color: paymentBadge.bg, borderRadius: BorderRadius.circular(AppRadius.pill)),
@@ -1061,21 +1258,14 @@ class _RecentOrderCard extends StatelessWidget {
                   children: [
                     Icon(paymentBadge.icon, size: 11, color: paymentBadge.fg),
                     const SizedBox(width: 3),
-                    Text(paymentBadge.label, style: TextStyle(color: paymentBadge.fg, fontSize: 11, fontWeight: FontWeight.w700)),
+                    Text(paymentBadge.label, style: TextStyle(color: paymentBadge.fg, fontSize: 10.5, fontWeight: FontWeight.w700)),
                   ],
                 ),
               ),
-              if (onReorder != null) ...[
-                const Spacer(),
-                TextButton.icon(
-                  onPressed: onReorder,
-                  icon: const Icon(Icons.replay_rounded, size: 16),
-                  label: const Text('Reorder'),
-                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4)),
-                ),
-              ],
             ],
           ),
+          const SizedBox(width: AppSpacing.xs),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary, size: 18),
         ],
       ),
     );
@@ -1086,10 +1276,10 @@ class _RecentOrderCard extends StatelessWidget {
     final status = order['payment_status']?.toString() ?? 'pending';
     final methodLabel = switch (method) {
       'upi' => 'UPI',
-      'cash_on_delivery' => 'COD',
+      'cash_on_delivery' => 'Cash',
       _ => 'Payment',
     };
-    final statusLabel = status.isEmpty ? 'PENDING' : status.toUpperCase();
+    final statusLabel = status.isEmpty ? 'Pending' : '${status[0].toUpperCase()}${status.substring(1)}';
     final label = '$methodLabel • $statusLabel';
 
     return switch (status) {

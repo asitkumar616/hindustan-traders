@@ -18,13 +18,12 @@ import '../src/widgets/app_card.dart';
 import '../src/widgets/app_empty_state.dart';
 import '../src/widgets/app_error_state.dart';
 import '../src/widgets/app_loading_state.dart';
-import '../src/widgets/app_quick_action_tile.dart';
-import '../src/widgets/app_voice_bottom_nav.dart';
-import '../src/widgets/ask_assistant_sheet.dart';
+import '../src/widgets/app_voice_bottom_nav.dart' show AppNavItem;
 import '../src/widgets/notification_bell.dart';
 import '../src/widgets/notifications_card.dart';
+import '../src/widgets/dashboard_bottom_nav.dart';
+import '../src/widgets/dashboard_quick_action_tile.dart';
 import '../src/widgets/owner_nav_drawer.dart';
-import '../src/widgets/voice_order_card.dart';
 
 class OwnerHomeScreen extends StatefulWidget {
   const OwnerHomeScreen({super.key});
@@ -140,40 +139,14 @@ class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
         child: RefreshIndicator(
           onRefresh: _loadDashboard,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.sm, AppSpacing.xl, AppSpacing.xxl),
+            padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.xxl),
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  IconButton(
-                    onPressed: _openMenu,
-                    icon: const Icon(Icons.menu_rounded),
-                    color: AppColors.textPrimary,
-                  ),
-                  NotificationBell(businessIds: [businessId], onTap: _showNotifications),
-                ],
-              ),
-              InkWell(
-                onTap: _openMenu,
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                child: Row(
-                  children: [
-                    const Icon(Icons.storefront_rounded, size: 18, color: AppColors.ownerPrimary),
-                    const SizedBox(width: AppSpacing.xs),
-                    Expanded(
-                      child: Text(
-                        _summary.businessName.isEmpty
-                            ? (_ownerName?.isNotEmpty == true ? _ownerName! : 'Your Shop')
-                            : _summary.businessName,
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const Icon(Icons.keyboard_arrow_down_rounded, size: 20, color: AppColors.textSecondary),
-                    const SizedBox(width: AppSpacing.sm),
-                    const Text('Owner', style: AppTextStyles.caption),
-                  ],
-                ),
+              _DashboardHeader(
+                businessName: _summary.businessName,
+                ownerName: _ownerName,
+                businessId: businessId,
+                onBusinessTap: _openMenu,
+                onNotificationsTap: _showNotifications,
               ),
               if (_loadError != null) ...[
                 const SizedBox(height: AppSpacing.md),
@@ -183,9 +156,9 @@ class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
                 ),
               ],
               const SizedBox(height: AppSpacing.lg),
-              _GoodMorningBanner(loading: _isLoading),
+              const _GreetingCard(),
               const SizedBox(height: AppSpacing.lg),
-              _TodayStatsGrid(
+              _MetricGrid(
                 today: today,
                 yesterday: yesterday,
                 loading: _isLoading,
@@ -194,112 +167,75 @@ class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
                 onTapPaid: hasBusiness ? () => _push(OwnerOrdersScreen(businessId: businessId, todayOnly: true)) : null,
                 onTapPending: hasBusiness ? () => _push(OwnerOrdersScreen(businessId: businessId, todayOnly: true)) : null,
               ),
-              const SizedBox(height: AppSpacing.xl),
-const Row(
+              const SizedBox(height: AppSpacing.lg),
+              Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('ORDER STATUS', style: AppTextStyles.sectionLabel),
-                  Text('Today', style: AppTextStyles.sectionLabel),
+                  const Text('Order Status', style: AppTextStyles.subheading),
+                  Text('Today', style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600)),
                 ],
               ),
-              const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpacing.sm),
               _OrderStatusRow(
                 stats: today,
                 onTap: hasBusiness ? () => _push(OwnerOrdersScreen(businessId: businessId, todayOnly: true)) : null,
               ),
-              const SizedBox(height: AppSpacing.xl),
-              const Text('QUICK ACTIONS', style: AppTextStyles.sectionLabel),
-              const SizedBox(height: AppSpacing.md),
-              GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisSpacing: AppSpacing.md,
-                mainAxisSpacing: AppSpacing.md,
-                childAspectRatio: 1.5,
+              const SizedBox(height: AppSpacing.lg),
+              const Text('Quick Actions', style: AppTextStyles.subheading),
+              const SizedBox(height: AppSpacing.sm),
+              Row(
                 children: [
-                  AppQuickActionTile(
-                    icon: Icons.add_box_rounded,
-                    label: 'Add Product',
-                    accentColor: AppColors.categoryDal,
-                    onTap: hasBusiness
-                        ? () => _push(OwnerProductManagementScreen(businessId: businessId, autoOpenAdd: true))
-                        : () {},
+                  Expanded(
+                    child: DashboardQuickActionTile(
+                      icon: Icons.add_box_rounded,
+                      label: 'Add Product',
+                      accentColor: AppColors.categoryDal,
+                      onTap: hasBusiness
+                          ? () => _push(OwnerProductManagementScreen(businessId: businessId, autoOpenAdd: true))
+                          : () {},
+                    ),
                   ),
-                  AppQuickActionTile(
-                    icon: Icons.receipt_long_rounded,
-                    label: 'View Orders',
-                    accentColor: AppColors.danger,
-                    onTap: () => _push(OwnerOrdersScreen(businessId: businessId)),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: DashboardQuickActionTile(
+                      icon: Icons.receipt_long_rounded,
+                      label: 'View Orders',
+                      accentColor: AppColors.danger,
+                      onTap: () => _push(OwnerOrdersScreen(businessId: businessId)),
+                    ),
                   ),
-                  AppQuickActionTile(
-                    icon: Icons.people_alt_rounded,
-                    label: 'Customers',
-                    accentColor: AppColors.info,
-                    onTap: () => _push(OwnerCustomerManagementScreen(businessId: businessId)),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: DashboardQuickActionTile(
+                      icon: Icons.people_alt_rounded,
+                      label: 'Customers',
+                      accentColor: AppColors.info,
+                      onTap: () => _push(OwnerCustomerManagementScreen(businessId: businessId)),
+                    ),
                   ),
-                  AppQuickActionTile(
-                    icon: Icons.bar_chart_rounded,
-                    label: 'Reports',
-                    accentColor: AppColors.success,
-                    onTap: () => _push(OwnerReportsScreen(businessId: businessId)),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: DashboardQuickActionTile(
+                      icon: Icons.bar_chart_rounded,
+                      label: 'Reports',
+                      accentColor: AppColors.success,
+                      onTap: () => _push(OwnerReportsScreen(businessId: businessId)),
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: AppSpacing.lg),
-              InkWell(
-                onTap: () => _showAssistant(businessId),
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [AppColors.ownerPrimaryDark, AppColors.ownerPrimaryLight],
-                    ),
-                    borderRadius: BorderRadius.circular(AppRadius.lg),
-                    boxShadow: [
-                      BoxShadow(color: AppColors.ownerPrimary.withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 8)),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), shape: BoxShape.circle),
-                        child: const Icon(Icons.mic_rounded, color: Colors.white, size: 24),
-                      ),
-                      const SizedBox(width: AppSpacing.md),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Ask Assistant', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
-                            SizedBox(height: 2),
-                            Text('Speak or type to get things done', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                          ],
-                        ),
-                      ),
-                      const Icon(Icons.chevron_right_rounded, color: Colors.white70),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Recent Orders', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                  const Text('Recent Orders', style: AppTextStyles.subheading),
                   TextButton(
                     onPressed: hasBusiness ? () => _push(OwnerOrdersScreen(businessId: businessId)) : null,
                     child: const Text('View All'),
                   ),
                 ],
               ),
-              const SizedBox(height: AppSpacing.sm),
+              const SizedBox(height: AppSpacing.xs),
               if (_isLoading)
                 const AppLoadingState()
               else if (recentOrders.isEmpty)
@@ -311,7 +247,7 @@ const Row(
               else
                 ...recentOrders.asMap().entries.map(
                   (entry) => Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                     child: _RecentOrderCard(
                       order: entry.value,
                       avatarIndex: entry.key,
@@ -323,10 +259,8 @@ const Row(
           ),
         ),
       ),
-      bottomNavigationBar: AppVoiceBottomNav(
-        accentDark: AppColors.primaryDark,
-        accentLight: AppColors.primaryLight,
-        leftItems: [
+      bottomNavigationBar: DashboardBottomNav(
+        items: [
           const AppNavItem(icon: Icons.home_rounded, label: 'Dashboard', active: true),
           AppNavItem(
             icon: Icons.receipt_long_outlined,
@@ -338,8 +272,6 @@ const Row(
             label: 'Products',
             onTap: hasBusiness ? () => _push(OwnerProductManagementScreen(businessId: businessId)) : null,
           ),
-        ],
-        rightItems: [
           AppNavItem(
             icon: Icons.people_alt_outlined,
             label: 'Customers',
@@ -347,31 +279,7 @@ const Row(
           ),
           AppNavItem(icon: Icons.more_horiz_rounded, label: 'More', onTap: _openMenu),
         ],
-        onVoice: () => _showVoiceOrderSheet(businessId),
       ),
-    );
-  }
-
-  void _showVoiceOrderSheet(String businessId) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
-      ),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: SafeArea(top: false, child: VoiceOrderCard(businessId: businessId.isEmpty ? null : businessId)),
-      ),
-    );
-  }
-
-  void _showAssistant(String businessId) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
-      builder: (_) => AskAssistantSheet(businessId: businessId),
     );
   }
 }
@@ -445,10 +353,92 @@ int? _percentDelta(num today, num yesterday) {
   return (((today - yesterday) / yesterday) * 100).round();
 }
 
-class _GoodMorningBanner extends StatelessWidget {
-  const _GoodMorningBanner({required this.loading});
+/// Header row: brand mark + tagline on the left, the owner's business name
+/// (tap to open the nav drawer -- there's no multi-business switcher yet)
+/// with role label and the notification bell on the right.
+class _DashboardHeader extends StatelessWidget {
+  const _DashboardHeader({
+    required this.businessName,
+    required this.ownerName,
+    required this.businessId,
+    required this.onBusinessTap,
+    required this.onNotificationsTap,
+  });
 
-  final bool loading;
+  final String businessName;
+  final String? ownerName;
+  final String businessId;
+  final VoidCallback onBusinessTap;
+  final Future<void> Function() onNotificationsTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final displayName = businessName.isEmpty
+        ? (ownerName?.isNotEmpty == true ? ownerName! : 'Your Shop')
+        : businessName;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Image.asset('assets/images/branding/logo.png', width: 28, height: 28, fit: BoxFit.contain),
+        const SizedBox(width: AppSpacing.sm),
+        const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'OdiaTraders',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary, height: 1.1),
+            ),
+            Text(
+              'Wholesale Made Simple',
+              style: TextStyle(fontSize: 9, color: AppColors.textSecondary, height: 1.2),
+            ),
+          ],
+        ),
+        const Spacer(),
+        InkWell(
+          onTap: onBusinessTap,
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 108),
+                      child: Text(
+                        displayName,
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ),
+                    const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppColors.textSecondary),
+                  ],
+                ),
+                const Text('Owner', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Container(height: 26, width: 1, color: AppColors.divider),
+        NotificationBell(businessIds: [businessId], onTap: onNotificationsTap),
+      ],
+    );
+  }
+}
+
+/// Compact cream greeting banner. Deliberately not the large saturated
+/// orange gradient used elsewhere in the app -- this screen's reference
+/// mockup calls for a quieter, low-chrome header treatment.
+class _GreetingCard extends StatelessWidget {
+  const _GreetingCard();
 
   String get _greeting {
     final hour = DateTime.now().hour;
@@ -461,39 +451,34 @@ class _GoodMorningBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 14),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.primary, AppColors.primaryLight],
-        ),
+        color: const Color(0xFFFFF1E0),
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: [
-          BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 16, offset: const Offset(0, 8)),
-        ],
       ),
       child: Row(
         children: [
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(_greeting, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 4),
+                Text(_greeting, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                const SizedBox(height: 2),
                 const Text(
                   "Here's what's happening with your business today.",
-                  style: TextStyle(color: Colors.white, fontSize: 12.5),
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  maxLines: 2,
                 ),
               ],
             ),
           ),
           const SizedBox(width: AppSpacing.md),
           Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), shape: BoxShape.circle),
-            child: const Icon(Icons.storefront_rounded, color: Colors.white, size: 26),
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.14), shape: BoxShape.circle),
+            child: const Icon(Icons.storefront_rounded, color: AppColors.primary, size: 24),
           ),
         ],
       ),
@@ -501,8 +486,11 @@ class _GoodMorningBanner extends StatelessWidget {
   }
 }
 
-class _TodayStatsGrid extends StatelessWidget {
-  const _TodayStatsGrid({
+/// 2x2 KPI grid -- Today's Orders / Today's Revenue / Paid Orders / Pending
+/// Payment. Each card is a compact horizontal composition (icon beside
+/// label+value) rather than the stacked layout used elsewhere in the app.
+class _MetricGrid extends StatelessWidget {
+  const _MetricGrid({
     required this.today,
     required this.yesterday,
     required this.loading,
@@ -523,7 +511,7 @@ class _TodayStatsGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = [
-      _TodayStatTile(
+      _MetricCard(
         icon: Icons.shopping_cart_rounded,
         bg: AppColors.statOrdersBg,
         fg: AppColors.statOrdersFg,
@@ -532,7 +520,7 @@ class _TodayStatsGrid extends StatelessWidget {
         deltaPercent: loading ? null : _percentDelta(today.total, yesterday.total),
         onTap: onTapOrders,
       ),
-      _TodayStatTile(
+      _MetricCard(
         icon: Icons.currency_rupee_rounded,
         bg: const Color(0xFFE1F7E8),
         fg: AppColors.success,
@@ -541,7 +529,7 @@ class _TodayStatsGrid extends StatelessWidget {
         deltaPercent: loading ? null : _percentDelta(today.paidAmount, yesterday.paidAmount),
         onTap: onTapRevenue,
       ),
-      _TodayStatTile(
+      _MetricCard(
         icon: Icons.payments_rounded,
         bg: AppColors.statCustomersBg,
         fg: AppColors.statCustomersFg,
@@ -550,7 +538,7 @@ class _TodayStatsGrid extends StatelessWidget {
         subValue: loading ? null : '₹${formatIndianAmount(today.paidAmount)}',
         onTap: onTapPaid,
       ),
-      _TodayStatTile(
+      _MetricCard(
         icon: Icons.schedule_rounded,
         bg: AppColors.statPendingBg,
         fg: AppColors.statPendingFg,
@@ -565,16 +553,16 @@ class _TodayStatsGrid extends StatelessWidget {
       crossAxisCount: 2,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: AppSpacing.md,
-      mainAxisSpacing: AppSpacing.md,
-      childAspectRatio: 1.35,
+      crossAxisSpacing: AppSpacing.sm,
+      mainAxisSpacing: AppSpacing.sm,
+      childAspectRatio: 1.9,
       children: items,
     );
   }
 }
 
-class _TodayStatTile extends StatelessWidget {
-  const _TodayStatTile({
+class _MetricCard extends StatelessWidget {
+  const _MetricCard({
     required this.icon,
     required this.bg,
     required this.fg,
@@ -598,29 +586,47 @@ class _TodayStatTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppCard(
       onTap: onTap,
-      child: Column(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-                child: Icon(icon, size: 18, color: fg),
-              ),
-              if (deltaPercent != null) _DeltaChip(percent: deltaPercent!),
-            ],
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+            alignment: Alignment.center,
+            child: Icon(icon, size: 18, color: fg),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-          const SizedBox(height: 2),
-          Text(
-            subValue == null ? label : '$label · $subValue',
-            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-            overflow: TextOverflow.ellipsis,
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  value,
+                  style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (deltaPercent != null) ...[
+                  const SizedBox(height: 2),
+                  _DeltaCaption(percent: deltaPercent!),
+                ] else if (subValue != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subValue!,
+                    style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondary),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ],
+            ),
           ),
         ],
       ),
@@ -628,23 +634,33 @@ class _TodayStatTile extends StatelessWidget {
   }
 }
 
-class _DeltaChip extends StatelessWidget {
-  const _DeltaChip({required this.percent});
+class _DeltaCaption extends StatelessWidget {
+  const _DeltaCaption({required this.percent});
 
   final int percent;
 
   @override
   Widget build(BuildContext context) {
     if (percent == 0) {
-      return const Text('0%', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textSecondary));
+      return const Text(
+        'No change · vs yesterday',
+        style: TextStyle(fontSize: 10.5, color: AppColors.textSecondary),
+        overflow: TextOverflow.ellipsis,
+      );
     }
     final isUp = percent > 0;
     final color = isUp ? AppColors.success : AppColors.danger;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(isUp ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, size: 12, color: color),
-        Text('${percent.abs()}%', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+        Icon(isUp ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, size: 11, color: color),
+        Flexible(
+          child: Text(
+            '${percent.abs()}% vs yesterday',
+            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: color),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
       ],
     );
   }
@@ -659,10 +675,10 @@ class _OrderStatusRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = [
-      _OrderStatusItem(icon: Icons.shopping_cart_rounded, bg: AppColors.statOrdersBg, fg: AppColors.statOrdersFg, label: 'Total', value: stats.total),
-      _OrderStatusItem(icon: Icons.check_circle_rounded, bg: const Color(0xFFE1F7E8), fg: AppColors.success, label: 'Paid', value: stats.paid),
-      _OrderStatusItem(icon: Icons.schedule_rounded, bg: AppColors.statPendingBg, fg: AppColors.statPendingFg, label: 'Pending', value: stats.pending),
-      _OrderStatusItem(icon: Icons.cancel_rounded, bg: const Color(0xFFFCE4E4), fg: AppColors.danger, label: 'Cancelled', value: stats.cancelled),
+      _OrderStatusItem(icon: Icons.shopping_cart_rounded, fg: AppColors.statOrdersFg, label: 'Total', value: stats.total),
+      _OrderStatusItem(icon: Icons.check_circle_rounded, fg: AppColors.success, label: 'Paid', value: stats.paid),
+      _OrderStatusItem(icon: Icons.schedule_rounded, fg: AppColors.statPendingFg, label: 'Pending', value: stats.pending),
+      _OrderStatusItem(icon: Icons.cancel_rounded, fg: AppColors.danger, label: 'Cancelled', value: stats.cancelled),
     ];
 
     return Row(
@@ -673,14 +689,14 @@ class _OrderStatusRow extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: AppCard(
                   onTap: onTap,
-                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.md, horizontal: AppSpacing.xs),
+                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: AppSpacing.xs),
                   child: Column(
                     children: [
-                      Icon(item.icon, size: 18, color: item.fg),
-                      const SizedBox(height: 6),
-                      Text(item.value.toString(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-                      const SizedBox(height: 2),
-                      Text(item.label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                      Icon(item.icon, size: 16, color: item.fg),
+                      const SizedBox(height: 5),
+                      Text(item.value.toString(), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                      const SizedBox(height: 1),
+                      Text(item.label, style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondary)),
                     ],
                   ),
                 ),
@@ -693,9 +709,8 @@ class _OrderStatusRow extends StatelessWidget {
 }
 
 class _OrderStatusItem {
-  const _OrderStatusItem({required this.icon, required this.bg, required this.fg, required this.label, required this.value});
+  const _OrderStatusItem({required this.icon, required this.fg, required this.label, required this.value});
   final IconData icon;
-  final Color bg;
   final Color fg;
   final String label;
   final int value;
@@ -726,36 +741,37 @@ class _RecentOrderCard extends StatelessWidget {
 
     return AppCard(
       onTap: onTap,
+      padding: const EdgeInsets.all(AppSpacing.md),
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(color: avatarColor.withValues(alpha: 0.15), shape: BoxShape.circle),
             alignment: Alignment.center,
             child: Text(
               customerName.isNotEmpty ? customerName[0].toUpperCase() : '?',
-              style: TextStyle(color: avatarColor, fontWeight: FontWeight.w800, fontSize: 16),
+              style: TextStyle(color: avatarColor, fontWeight: FontWeight.w800, fontSize: 15),
             ),
           ),
-          const SizedBox(width: AppSpacing.md),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Text(orderRef, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary)),
+                    Text(orderRef, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: AppColors.textPrimary)),
                     if (timeLabel.isNotEmpty) ...[
                       const SizedBox(width: AppSpacing.sm),
-                      Text(timeLabel, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                      Text(timeLabel, style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondary)),
                     ],
                   ],
                 ),
                 const SizedBox(height: 2),
                 Text(
                   '$customerName · ${items.length} item${items.length == 1 ? '' : 's'}',
-                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
@@ -764,7 +780,7 @@ class _RecentOrderCard extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text('₹${formatIndianAmount(amount)}', style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+              Text('₹${formatIndianAmount(amount)}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textPrimary)),
               const SizedBox(height: 4),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -774,14 +790,14 @@ class _RecentOrderCard extends StatelessWidget {
                   children: [
                     Icon(paymentBadge.icon, size: 11, color: paymentBadge.fg),
                     const SizedBox(width: 3),
-                    Text(paymentBadge.label, style: TextStyle(color: paymentBadge.fg, fontSize: 11, fontWeight: FontWeight.w700)),
+                    Text(paymentBadge.label, style: TextStyle(color: paymentBadge.fg, fontSize: 10.5, fontWeight: FontWeight.w700)),
                   ],
                 ),
               ),
             ],
           ),
           const SizedBox(width: AppSpacing.xs),
-          const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary, size: 20),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary, size: 18),
         ],
       ),
     );

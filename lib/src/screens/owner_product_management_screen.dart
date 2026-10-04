@@ -8,7 +8,6 @@ import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
 import '../utils/formatters.dart';
-import '../utils/product_images.dart';
 import '../widgets/app_card.dart';
 import '../widgets/app_empty_state.dart';
 import '../widgets/app_filter_chip.dart';
@@ -16,6 +15,7 @@ import '../widgets/app_loading_state.dart';
 import '../widgets/app_primary_button.dart';
 import '../widgets/app_secondary_button.dart';
 import '../widgets/app_voice_bottom_nav.dart';
+import '../widgets/catalog_product_image.dart';
 import '../widgets/notification_bell.dart';
 import '../widgets/notifications_card.dart';
 import '../widgets/owner_nav_drawer.dart';
@@ -917,7 +917,6 @@ class _OwnerProductCard extends StatelessWidget {
         .where((variant) => variant['is_active'] != false)
         .map(ProductVariant.fromMap)
         .toList();
-    final imageAsset = productImageAsset(productName: name, category: category);
     final subtitle = [category, brand].where((value) => value != null && value.isNotEmpty).join(' • ');
 
     return AppCard(
@@ -927,27 +926,12 @@ class _OwnerProductCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ClipRRect(
+              CatalogProductImage(
+                productName: name,
+                category: category,
+                imageUrl: product['image_url']?.toString(),
+                size: 72,
                 borderRadius: BorderRadius.circular(AppRadius.sm),
-                child: imageAsset == null
-                    ? Container(
-                        width: 72,
-                        height: 72,
-                        color: AppColors.ownerPrimary.withValues(alpha: 0.1),
-                        child: const Icon(Icons.inventory_2_outlined, color: AppColors.ownerPrimary),
-                      )
-                    : Image.asset(
-                        imageAsset,
-                        width: 72,
-                        height: 72,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => Container(
-                          width: 72,
-                          height: 72,
-                          color: AppColors.ownerPrimary.withValues(alpha: 0.1),
-                          child: const Icon(Icons.inventory_2_outlined, color: AppColors.ownerPrimary),
-                        ),
-                      ),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
