@@ -13,6 +13,7 @@ import '../src/theme/app_text_styles.dart';
 import '../src/utils/category_visuals.dart';
 import '../src/utils/formatters.dart';
 import '../src/utils/product_images.dart';
+import '../src/utils/transaction_period_stats.dart';
 import '../src/widgets/app_card.dart';
 import '../src/widgets/app_empty_state.dart';
 import '../src/widgets/app_error_state.dart';
@@ -22,6 +23,7 @@ import '../src/widgets/ask_assistant_sheet.dart';
 import '../src/widgets/dashboard_bottom_nav.dart';
 import '../src/widgets/dashboard_quick_action_tile.dart';
 import '../src/widgets/notification_bell.dart';
+import '../src/widgets/transaction_overview_card.dart';
 import '../src/widgets/voice_order_card.dart';
 import 'customer_home_screen.dart';
 import 'customer_orders_screen.dart';
@@ -424,6 +426,7 @@ class _CustomerShopsScreenState extends State<CustomerShopsScreen> {
     final greetingName = _customerName?.isNotEmpty == true ? _customerName! : 'there';
     final stats = _CustomerStats.compute(_orders);
     final recentOrders = _orders.take(3).toList();
+    final transactionHistory = TransactionHistory.compute(_orders, include: (o) => o['status'] != 'cancelled');
 
     return Scaffold(
       backgroundColor: AppColors.surfaceMuted,
@@ -457,6 +460,13 @@ class _CustomerShopsScreenState extends State<CustomerShopsScreen> {
                   onTapPendingCod: _openOrders,
                 ),
               ],
+              const SizedBox(height: AppSpacing.lg),
+              TransactionOverviewCard(
+                history: transactionHistory,
+                loading: _loading,
+                amountLabel: 'Spending (₹)',
+                onTap: _openOrders,
+              ),
               const SizedBox(height: AppSpacing.lg),
               const Text('Quick Actions', style: AppTextStyles.subheading),
               const SizedBox(height: AppSpacing.sm),

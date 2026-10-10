@@ -14,6 +14,7 @@ import '../src/theme/app_radius.dart';
 import '../src/theme/app_spacing.dart';
 import '../src/theme/app_text_styles.dart';
 import '../src/utils/formatters.dart';
+import '../src/utils/transaction_period_stats.dart';
 import '../src/widgets/app_card.dart';
 import '../src/widgets/app_empty_state.dart';
 import '../src/widgets/app_error_state.dart';
@@ -25,6 +26,7 @@ import '../src/widgets/notifications_card.dart';
 import '../src/widgets/dashboard_bottom_nav.dart';
 import '../src/widgets/dashboard_quick_action_tile.dart';
 import '../src/widgets/owner_nav_drawer.dart';
+import '../src/widgets/transaction_overview_card.dart';
 
 class OwnerHomeScreen extends StatefulWidget {
   const OwnerHomeScreen({super.key});
@@ -128,7 +130,7 @@ class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
     final now = DateTime.now();
     final today = _DayStats.forDay(_orders, now);
     final yesterday = _DayStats.forDay(_orders, now.subtract(const Duration(days: 1)));
-    final revenue = _RevenueTotals.compute(_orders);
+    final transactionHistory = TransactionHistory.compute(_orders, include: (o) => o['payment_status'] == 'paid');
     final recentOrders = _orders.take(3).toList();
 
     return Scaffold(
@@ -183,8 +185,8 @@ class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
                 onTapPending: hasBusiness ? () => _push(OwnerOrdersScreen(businessId: businessId, todayOnly: true)) : null,
               ),
               const SizedBox(height: AppSpacing.lg),
-              _RevenueOverviewCard(
-                totals: revenue,
+              TransactionOverviewCard(
+                history: transactionHistory,
                 loading: _isLoading,
                 onTap: hasBusiness ? () => _push(OwnerTransactionsScreen(businessId: businessId)) : null,
               ),
@@ -372,113 +374,6 @@ class _DayStats {
 int? _percentDelta(num today, num yesterday) {
   if (yesterday == 0) return null;
   return (((today - yesterday) / yesterday) * 100).round();
-}
-
-/// Month-to-date and year-to-date paid revenue, derived from the same
-/// already-fetched order list as [_DayStats] (full order history for this
-/// business, not just today's) -- no separate query needed.
-class _RevenueTotals {
-  const _RevenueTotals({required this.monthTotal, required this.yearTotal});
-
-  final double monthTotal;
-  final double yearTotal;
-
-  static _RevenueTotals compute(List<Map<String, dynamic>> orders) {
-    final now = DateTime.now();
-    var month = 0.0, year = 0.0;
-
-    for (final order in orders) {
-      if (order['payment_status'] != 'paid') continue;
-      final createdRaw = order['created_at']?.toString();
-      final created = createdRaw == null ? null : DateTime.tryParse(createdRaw)?.toLocal();
-      if (created == null || created.year != now.year) continue;
-
-      final amount = (order['total_amount'] as num?)?.toDouble() ?? 0;
-      year += amount;
-      if (created.month == now.month) month += amount;
-    }
-
-    return _RevenueTotals(monthTotal: month, yearTotal: year);
-  }
-}
-
-/// Full-width summary card showing paid-revenue totals for the current
-/// calendar month and year -- distinct from the "Today's Revenue" KPI tile
-/// above it, which only ever covers the current day.
-class _RevenueOverviewCard extends StatelessWidget {
-  const _RevenueOverviewCard({required this.totals, required this.loading, this.onTap});
-
-  final _RevenueTotals totals;
-  final bool loading;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      onTap: onTap,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(color: const Color(0xFFE1F7E8), borderRadius: BorderRadius.circular(9)),
-                child: const Icon(Icons.trending_up_rounded, color: AppColors.success, size: 17),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              const Text('Revenue Overview', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              Expanded(
-                child: _RevenueFigure(
-                  label: 'This Month',
-                  value: loading ? '—' : '₹${formatIndianAmount(totals.monthTotal)}',
-                ),
-              ),
-              Container(width: 1, height: 36, color: AppColors.divider),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: _RevenueFigure(
-                  label: 'This Year',
-                  value: loading ? '—' : '₹${formatIndianAmount(totals.yearTotal)}',
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RevenueFigure extends StatelessWidget {
-  const _RevenueFigure({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
-    );
-  }
 }
 
 /// Header row: brand mark + tagline on the left, the owner's business name
