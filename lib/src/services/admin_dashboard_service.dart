@@ -41,6 +41,7 @@ class AdminOwnerRecord {
   final String approvalStatus;
   final bool isActive;
   final int customerCount;
+  final bool isDeleted;
 
   const AdminOwnerRecord({
     required this.profileId,
@@ -52,6 +53,7 @@ class AdminOwnerRecord {
     required this.approvalStatus,
     required this.isActive,
     required this.customerCount,
+    this.isDeleted = false,
   });
 }
 
@@ -87,6 +89,7 @@ class AdminCustomerRecord {
   final String? phone;
   final String status;
   final bool isActive;
+  final bool isDeleted;
 
   const AdminCustomerRecord({
     required this.customerId,
@@ -98,6 +101,7 @@ class AdminCustomerRecord {
     required this.phone,
     required this.status,
     required this.isActive,
+    this.isDeleted = false,
   });
 }
 
@@ -195,6 +199,7 @@ class AdminDashboardService {
             approvalStatus: data['approval_status']?.toString() ?? 'pending',
             isActive: data['is_active'] == true,
             customerCount: _asInt(data['customer_count']),
+            isDeleted: data['deleted_at'] != null,
           );
         })
         .where((row) => row.profileId.isNotEmpty)
@@ -251,6 +256,7 @@ class AdminDashboardService {
             phone: data['phone']?.toString(),
             status: data['status']?.toString() ?? 'NOT_REGISTERED',
             isActive: data['is_active'] == true,
+            isDeleted: data['deleted_at'] != null,
           );
         })
         .where((row) => row.customerId.isNotEmpty)
@@ -323,6 +329,37 @@ class AdminDashboardService {
       'p_status': status,
       'p_is_active': isActive,
     });
+  }
+
+  /// Soft-deletes an owner: blocks login, suspends their business(es), and
+  /// deactivates their business memberships. Their products/orders/invoices
+  /// are untouched and stay fully attributable -- see
+  /// supabase/add_owner_customer_soft_delete.sql. Reversible via [restoreOwner].
+  static Future<void> deleteOwner(String profileId) async {
+    final client = _clientOrNull;
+    if (client == null) throw Exception('Backend is not ready.');
+    await client.rpc('admin_delete_owner', params: {'p_profile_id': profileId});
+  }
+
+  static Future<void> restoreOwner(String profileId) async {
+    final client = _clientOrNull;
+    if (client == null) throw Exception('Backend is not ready.');
+    await client.rpc('admin_restore_owner', params: {'p_profile_id': profileId});
+  }
+
+  /// Soft-deletes one customer<->business relationship (a customer who
+  /// shops with several businesses keeps their other ones). Historical
+  /// orders are untouched. Reversible via [restoreCustomer].
+  static Future<void> deleteCustomer(String customerId) async {
+    final client = _clientOrNull;
+    if (client == null) throw Exception('Backend is not ready.');
+    await client.rpc('admin_delete_customer', params: {'p_customer_id': customerId});
+  }
+
+  static Future<void> restoreCustomer(String customerId) async {
+    final client = _clientOrNull;
+    if (client == null) throw Exception('Backend is not ready.');
+    await client.rpc('admin_restore_customer', params: {'p_customer_id': customerId});
   }
 
   static Map<String, dynamic> _firstRow(dynamic response) {

@@ -318,6 +318,51 @@ class _AdminOwnerManagementScreenState extends State<AdminOwnerManagementScreen>
     }
   }
 
+  Future<void> _confirmDeleteOwner(AdminOwnerRecord owner) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete this owner?'),
+        content: Text(
+          '${owner.ownerName} (${owner.businessName}) will no longer be able to log in, and their shop will stop '
+          'appearing to customers. Their products, orders, and invoices are kept exactly as they are -- nothing is '
+          'deleted -- and this can be undone with Restore.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await AdminDashboardService.deleteOwner(owner.profileId);
+      await _loadOwners();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Owner deleted.')));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Unable to delete owner: $error')));
+    }
+  }
+
+  Future<void> _restoreOwner(AdminOwnerRecord owner) async {
+    try {
+      await AdminDashboardService.restoreOwner(owner.profileId);
+      await _loadOwners();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Owner restored.')));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Unable to restore owner: $error')));
+    }
+  }
+
   Future<void> _showEditOwnerDialog(AdminOwnerRecord owner) async {
     final nameController = TextEditingController(text: owner.ownerName);
     final phoneController = TextEditingController(text: owner.ownerPhone);
@@ -538,6 +583,8 @@ class _AdminOwnerManagementScreenState extends State<AdminOwnerManagementScreen>
                                   onReject: () => _setOwnerState(owner, status: 'rejected', isActive: false),
                                   onActivate: () => _setOwnerState(owner, status: owner.approvalStatus, isActive: true),
                                   onDeactivate: () => _setOwnerState(owner, status: owner.approvalStatus, isActive: false),
+                                  onDelete: () => _confirmDeleteOwner(owner),
+                                  onRestore: () => _restoreOwner(owner),
                                 ),
                               ),
                             ),
@@ -573,6 +620,8 @@ class _OwnerCard extends StatelessWidget {
     required this.onReject,
     required this.onActivate,
     required this.onDeactivate,
+    required this.onDelete,
+    required this.onRestore,
   });
 
   final AdminOwnerRecord owner;
@@ -581,6 +630,8 @@ class _OwnerCard extends StatelessWidget {
   final VoidCallback onReject;
   final VoidCallback onActivate;
   final VoidCallback onDeactivate;
+  final VoidCallback onDelete;
+  final VoidCallback onRestore;
 
   @override
   Widget build(BuildContext context) {
@@ -611,6 +662,12 @@ class _OwnerCard extends StatelessWidget {
                   spacing: AppSpacing.sm,
                   runSpacing: 4,
                   children: [
+                    if (owner.isDeleted)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(color: const Color(0xFFFCE4E4), borderRadius: BorderRadius.circular(AppRadius.pill)),
+                        child: const Text('Deleted', style: TextStyle(color: AppColors.danger, fontSize: 11, fontWeight: FontWeight.w700)),
+                      ),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(color: statusStyle.bg, borderRadius: BorderRadius.circular(AppRadius.pill)),
@@ -650,14 +707,23 @@ class _OwnerCard extends StatelessWidget {
                   onActivate();
                 case 'deactivate':
                   onDeactivate();
+                case 'delete':
+                  onDelete();
+                case 'restore':
+                  onRestore();
               }
             },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'edit', child: Text('Edit owner')),
-              PopupMenuItem(value: 'approve', child: Text('Approve')),
-              PopupMenuItem(value: 'reject', child: Text('Reject')),
-              PopupMenuItem(value: 'activate', child: Text('Activate')),
-              PopupMenuItem(value: 'deactivate', child: Text('Deactivate')),
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'edit', child: Text('Edit owner')),
+              const PopupMenuItem(value: 'approve', child: Text('Approve')),
+              const PopupMenuItem(value: 'reject', child: Text('Reject')),
+              const PopupMenuItem(value: 'activate', child: Text('Activate')),
+              const PopupMenuItem(value: 'deactivate', child: Text('Deactivate')),
+              const PopupMenuDivider(),
+              if (owner.isDeleted)
+                const PopupMenuItem(value: 'restore', child: Text('Restore'))
+              else
+                const PopupMenuItem(value: 'delete', child: Text('Delete owner', style: TextStyle(color: AppColors.danger))),
             ],
           ),
         ],

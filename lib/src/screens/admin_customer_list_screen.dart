@@ -60,6 +60,51 @@ class _AdminCustomerListScreenState extends State<AdminCustomerListScreen> {
     }
   }
 
+  Future<void> _confirmDeleteCustomer(AdminCustomerRecord customer) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete this customer?'),
+        content: Text(
+          '${customer.displayName} will no longer be able to log in or order from ${customer.businessName}. '
+          'Their order history and invoices are kept exactly as they are -- nothing is deleted -- and this can be '
+          'undone with Restore. Any other businesses they shop with are not affected.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await AdminDashboardService.deleteCustomer(customer.customerId);
+      await _loadCustomers();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Customer deleted.')));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Unable to delete customer: $error')));
+    }
+  }
+
+  Future<void> _restoreCustomer(AdminCustomerRecord customer) async {
+    try {
+      await AdminDashboardService.restoreCustomer(customer.customerId);
+      await _loadCustomers();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Customer restored.')));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Unable to restore customer: $error')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -137,7 +182,11 @@ class _AdminCustomerListScreenState extends State<AdminCustomerListScreen> {
                             ..._customers.map(
                               (customer) => Padding(
                                 padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                                child: _CustomerCard(customer: customer),
+                                child: _CustomerCard(
+                                  customer: customer,
+                                  onDelete: () => _confirmDeleteCustomer(customer),
+                                  onRestore: () => _restoreCustomer(customer),
+                                ),
                               ),
                             ),
                         ],
@@ -161,9 +210,11 @@ class _AdminCustomerListScreenState extends State<AdminCustomerListScreen> {
 }
 
 class _CustomerCard extends StatelessWidget {
-  const _CustomerCard({required this.customer});
+  const _CustomerCard({required this.customer, required this.onDelete, required this.onRestore});
 
   final AdminCustomerRecord customer;
+  final VoidCallback onDelete;
+  final VoidCallback onRestore;
 
   @override
   Widget build(BuildContext context) {
@@ -191,23 +242,52 @@ class _CustomerCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(customer.businessName, style: AppTextStyles.bodyMuted, overflow: TextOverflow.ellipsis),
                 const SizedBox(height: AppSpacing.sm),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: customer.isActive ? const Color(0xFFE1F7E8) : AppColors.divider,
-                    borderRadius: BorderRadius.circular(AppRadius.pill),
-                  ),
-                  child: Text(
-                    customer.isActive ? 'Active' : customer.status,
-                    style: TextStyle(
-                      color: customer.isActive ? const Color(0xFF2E7D32) : AppColors.textSecondary,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: 4,
+                  children: [
+                    if (customer.isDeleted)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(color: const Color(0xFFFCE4E4), borderRadius: BorderRadius.circular(AppRadius.pill)),
+                        child: const Text('Deleted', style: TextStyle(color: AppColors.danger, fontSize: 11, fontWeight: FontWeight.w700)),
+                      ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: customer.isActive ? const Color(0xFFE1F7E8) : AppColors.divider,
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                      ),
+                      child: Text(
+                        customer.isActive ? 'Active' : customer.status,
+                        style: TextStyle(
+                          color: customer.isActive ? const Color(0xFF2E7D32) : AppColors.textSecondary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert_rounded, color: AppColors.textSecondary),
+            onSelected: (value) {
+              switch (value) {
+                case 'delete':
+                  onDelete();
+                case 'restore':
+                  onRestore();
+              }
+            },
+            itemBuilder: (_) => [
+              if (customer.isDeleted)
+                const PopupMenuItem(value: 'restore', child: Text('Restore'))
+              else
+                const PopupMenuItem(value: 'delete', child: Text('Delete customer', style: TextStyle(color: AppColors.danger))),
+            ],
           ),
         ],
       ),
