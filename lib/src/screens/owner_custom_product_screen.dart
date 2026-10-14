@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../models/catalog_category.dart';
@@ -15,6 +14,7 @@ import '../theme/app_radius.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/app_primary_button.dart';
+import '../widgets/image_source_sheet.dart';
 import 'owner_configure_variants_screen.dart';
 
 /// One owner-entered "Attribute / Value" pair (e.g. "RAM" / "8GB"), kept
@@ -64,7 +64,6 @@ class _OwnerCustomProductScreenState extends State<OwnerCustomProductScreen> {
   late String _baseUnit = _matchBaseUnit(widget.initialDraft?.unit);
   bool _saving = false;
   bool _listening = false;
-  final ImagePicker _imagePicker = ImagePicker();
   File? _pickedImage;
   final List<_SpecRow> _specRows = [];
 
@@ -113,10 +112,12 @@ class _OwnerCustomProductScreenState extends State<OwnerCustomProductScreen> {
   }
 
   Future<void> _pickImage() async {
-    final picked = await _imagePicker.pickImage(source: ImageSource.gallery, imageQuality: 80, maxWidth: 1600);
-    if (picked == null) return;
-    setState(() => _pickedImage = File(picked.path));
+    final picked = await pickProductImageWithPreview(context);
+    if (picked == null || !mounted) return;
+    setState(() => _pickedImage = picked);
   }
+
+  void _removeImage() => setState(() => _pickedImage = null);
 
   Future<void> _toggleVoiceFill() async {
     if (_listening) {
@@ -243,29 +244,48 @@ class _OwnerCustomProductScreenState extends State<OwnerCustomProductScreen> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                InkWell(
-                  onTap: _pickImage,
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                  child: Container(
-                    width: 96,
-                    height: 96,
-                    clipBehavior: Clip.antiAlias,
-                    decoration: BoxDecoration(
-                      color: AppColors.ownerPrimary.withValues(alpha: 0.06),
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    InkWell(
+                      onTap: _pickImage,
                       borderRadius: BorderRadius.circular(AppRadius.md),
-                      border: Border.all(color: AppColors.divider),
+                      child: Container(
+                        width: 96,
+                        height: 96,
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          color: AppColors.ownerPrimary.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                          border: Border.all(color: AppColors.divider),
+                        ),
+                        child: _pickedImage == null
+                            ? const Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.add_a_photo_outlined, color: AppColors.ownerPrimary),
+                                  SizedBox(height: 4),
+                                  Text('Add Photo', style: AppTextStyles.caption, textAlign: TextAlign.center),
+                                ],
+                              )
+                            : Image.file(_pickedImage!, fit: BoxFit.cover),
+                      ),
                     ),
-                    child: _pickedImage == null
-                        ? const Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.add_a_photo_outlined, color: AppColors.ownerPrimary),
-                              SizedBox(height: 4),
-                              Text('Add Photo', style: AppTextStyles.caption, textAlign: TextAlign.center),
-                            ],
-                          )
-                        : Image.file(_pickedImage!, fit: BoxFit.cover),
-                  ),
+                    if (_pickedImage != null)
+                      Positioned(
+                        top: -8,
+                        right: -8,
+                        child: InkWell(
+                          onTap: _removeImage,
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(color: AppColors.danger, shape: BoxShape.circle),
+                            child: const Icon(Icons.close_rounded, size: 14, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
@@ -288,7 +308,7 @@ class _OwnerCustomProductScreenState extends State<OwnerCustomProductScreen> {
                       Text(
                         _pickedImage == null
                             ? 'Tap the photo box to add one, or leave blank to use a category icon.'
-                            : 'Photo selected.',
+                            : 'Photo selected. Tap it to replace, or the X to remove.',
                         style: AppTextStyles.caption,
                       ),
                     ],

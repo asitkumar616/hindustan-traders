@@ -257,7 +257,10 @@ class AdminDashboardService {
         .toList(growable: false);
   }
 
-  static Future<void> createOwner({
+  /// Returns the new owner's business_id (from admin_owner_create's own
+  /// return row) so the caller can immediately assign business categories
+  /// to it -- null if the backend returned no row.
+  static Future<String?> createOwner({
     required String ownerName,
     required String phone,
     required String businessName,
@@ -269,13 +272,19 @@ class AdminDashboardService {
       throw Exception('Backend is not ready.');
     }
 
-    await client.rpc('admin_owner_create', params: {
+    final response = await client.rpc('admin_owner_create', params: {
       'p_owner_name': ownerName,
       'p_phone': phone,
       'p_business_name': businessName,
       'p_business_address': address,
       'p_status': status,
     });
+
+    final rows = response is List ? response : <dynamic>[];
+    if (rows.isNotEmpty && rows.first is Map) {
+      return (rows.first as Map)['business_id']?.toString();
+    }
+    return null;
   }
 
   static Future<void> updateOwner({

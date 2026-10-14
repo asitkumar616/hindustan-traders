@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/catalog_category.dart';
 import '../models/master_product.dart';
@@ -16,6 +15,7 @@ import '../widgets/app_filter_chip.dart';
 import '../widgets/app_loading_state.dart';
 import '../widgets/app_primary_button.dart';
 import '../widgets/catalog_product_image.dart';
+import '../widgets/image_source_sheet.dart';
 import 'admin_catalog_import_screen.dart';
 
 /// Admin "Master Catalog Management" -- the global product list every
@@ -257,7 +257,6 @@ class _MasterProductFormState extends State<_MasterProductForm> {
   List<CatalogCategory> _subcategories = const <CatalogCategory>[];
   CatalogCategory? _selectedSubcategory;
   final List<_SpecRow> _specRows = [];
-  final ImagePicker _imagePicker = ImagePicker();
   File? _pickedImage;
   bool _saving = false;
 
@@ -289,10 +288,15 @@ class _MasterProductFormState extends State<_MasterProductForm> {
   }
 
   Future<void> _pickImage() async {
-    final picked = await _imagePicker.pickImage(source: ImageSource.gallery, imageQuality: 80, maxWidth: 1600);
-    if (picked == null) return;
-    setState(() => _pickedImage = File(picked.path));
+    final picked = await pickProductImageWithPreview(context);
+    if (picked == null || !mounted) return;
+    setState(() => _pickedImage = picked);
   }
+
+  void _removeImage() => setState(() {
+        _pickedImage = null;
+        _imageUrlController.clear();
+      });
 
   @override
   void dispose() {
@@ -392,24 +396,43 @@ class _MasterProductFormState extends State<_MasterProductForm> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  InkWell(
-                    onTap: _pickImage,
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                    child: Container(
-                      width: 80,
-                      height: 80,
-                      clipBehavior: Clip.antiAlias,
-                      decoration: BoxDecoration(
-                        color: AppColors.adminPrimary.withValues(alpha: 0.06),
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      InkWell(
+                        onTap: _pickImage,
                         borderRadius: BorderRadius.circular(AppRadius.md),
-                        border: Border.all(color: AppColors.divider),
+                        child: Container(
+                          width: 80,
+                          height: 80,
+                          clipBehavior: Clip.antiAlias,
+                          decoration: BoxDecoration(
+                            color: AppColors.adminPrimary.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                            border: Border.all(color: AppColors.divider),
+                          ),
+                          child: _pickedImage != null
+                              ? Image.file(_pickedImage!, fit: BoxFit.cover)
+                              : _imageUrlController.text.trim().isNotEmpty
+                                  ? Image.network(_imageUrlController.text.trim(), fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.image_outlined, color: AppColors.adminPrimary))
+                                  : const Icon(Icons.add_a_photo_outlined, color: AppColors.adminPrimary),
+                        ),
                       ),
-                      child: _pickedImage != null
-                          ? Image.file(_pickedImage!, fit: BoxFit.cover)
-                          : _imageUrlController.text.trim().isNotEmpty
-                              ? Image.network(_imageUrlController.text.trim(), fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.image_outlined, color: AppColors.adminPrimary))
-                              : const Icon(Icons.add_a_photo_outlined, color: AppColors.adminPrimary),
-                    ),
+                      if (_pickedImage != null || _imageUrlController.text.trim().isNotEmpty)
+                        Positioned(
+                          top: -8,
+                          right: -8,
+                          child: InkWell(
+                            onTap: _removeImage,
+                            borderRadius: BorderRadius.circular(AppRadius.pill),
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(color: AppColors.danger, shape: BoxShape.circle),
+                              child: const Icon(Icons.close_rounded, size: 14, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(width: AppSpacing.md),
                   Expanded(

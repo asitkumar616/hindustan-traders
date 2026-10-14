@@ -26,6 +26,7 @@ class _OwnerBusinessCategoriesScreenState extends State<OwnerBusinessCategoriesS
   bool _saving = false;
   List<CatalogCategory> _categories = const <CatalogCategory>[];
   Set<String> _selected = <String>{};
+  Set<String> _initiallySelected = <String>{};
 
   @override
   void initState() {
@@ -47,11 +48,41 @@ class _OwnerBusinessCategoriesScreenState extends State<OwnerBusinessCategoriesS
     setState(() {
       _categories = categories;
       _selected = selected;
+      _initiallySelected = {...selected};
       _loading = false;
     });
   }
 
+  /// Categories that were selected when this screen opened and are no
+  /// longer checked -- i.e. about to be removed from this business's
+  /// selection.
+  List<CatalogCategory> get _pendingRemovals {
+    final removedIds = _initiallySelected.difference(_selected);
+    if (removedIds.isEmpty) return const [];
+    return _categories.where((c) => removedIds.contains(c.id)).toList();
+  }
+
   Future<void> _save() async {
+    final removals = _pendingRemovals;
+    if (removals.isNotEmpty) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Remove categories?'),
+          content: Text(
+            'Removing ${removals.map((c) => c.name).join(', ')} will stop it from showing by default in '
+            'Add from Catalog. Products you\'ve already added, along with their orders and invoices, are '
+            'not affected and stay exactly as they are.',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Remove')),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    }
+
     setState(() => _saving = true);
     try {
       await CategoryService.saveBusinessCategories(widget.businessId, _selected);

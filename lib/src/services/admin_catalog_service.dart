@@ -149,4 +149,55 @@ class AdminCatalogService {
     final result = await client.rpc('admin_master_product_bulk_import', params: {'p_rows': rows});
     return (result as num?)?.toInt() ?? 0;
   }
+
+  /// This business's current primary + additional category selection
+  /// (Add/Edit Owner's "Business Categories" picker) -- active rows only.
+  static Future<OwnerCategorySelection> fetchOwnerCategories(String businessId) async {
+    final client = _clientOrNull;
+    if (client == null) return const OwnerCategorySelection();
+
+    final response = await client.rpc('admin_get_business_categories', params: {'p_business_id': businessId});
+    final rows = (response as List? ?? const []).whereType<Map>().toList();
+
+    String? primaryId;
+    final additionalIds = <String>{};
+    for (final row in rows) {
+      final id = row['category_id']?.toString();
+      if (id == null) continue;
+      if (row['is_primary'] == true) {
+        primaryId = id;
+      } else {
+        additionalIds.add(id);
+      }
+    }
+    return OwnerCategorySelection(primaryCategoryId: primaryId, additionalCategoryIds: additionalIds);
+  }
+
+  /// Sets this business's primary + additional categories in one call --
+  /// never deletes a row; a category removed from the selection is just
+  /// soft-deactivated (see admin_set_owner_categories).
+  static Future<void> setOwnerCategories({
+    required String businessId,
+    required String primaryCategoryId,
+    required Set<String> additionalCategoryIds,
+  }) async {
+    final client = _clientOrNull;
+    if (client == null) return;
+    await client.rpc('admin_set_owner_categories', params: {
+      'p_business_id': businessId,
+      'p_primary_category_id': primaryCategoryId,
+      'p_additional_category_ids': additionalCategoryIds.toList(),
+    });
+  }
+}
+
+/// A business's Primary (required, exactly one) + Additional (optional,
+/// many) category assignment, as set by Admin at Add/Edit Owner time.
+class OwnerCategorySelection {
+  const OwnerCategorySelection({this.primaryCategoryId, this.additionalCategoryIds = const {}});
+
+  final String? primaryCategoryId;
+  final Set<String> additionalCategoryIds;
+
+  bool get isEmpty => primaryCategoryId == null;
 }

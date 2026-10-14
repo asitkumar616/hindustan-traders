@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import '../models/catalog_category.dart';
+import '../services/admin_catalog_service.dart';
 import '../services/admin_dashboard_service.dart';
 import '../services/auth_service.dart';
+import '../services/category_service.dart';
 import '../services/voice_owner_parser.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
@@ -14,6 +17,7 @@ import '../widgets/app_flat_bottom_nav.dart';
 import '../widgets/app_loading_state.dart';
 import '../widgets/app_primary_button.dart';
 import '../widgets/app_voice_bottom_nav.dart' show AppNavItem;
+import '../widgets/business_category_picker_sheet.dart';
 import 'admin_business_list_screen.dart';
 import 'admin_customer_list_screen.dart';
 
@@ -71,6 +75,10 @@ class _AdminOwnerManagementScreenState extends State<AdminOwnerManagementScreen>
     bool submitting = false;
     bool listening = false;
     String voiceStatus = '';
+    OwnerCategorySelection categorySelection = const OwnerCategorySelection();
+
+    final categories = await CategoryService.fetchTopLevel();
+    if (!mounted) return;
 
     await showDialog<void>(
       context: context,
@@ -166,6 +174,21 @@ class _AdminOwnerManagementScreenState extends State<AdminOwnerManagementScreen>
                       decoration: const InputDecoration(labelText: 'Address (optional)'),
                     ),
                     const SizedBox(height: 10),
+                    _CategorySelectorField(
+                      categories: categories,
+                      selection: categorySelection,
+                      onTap: () async {
+                        final result = await showBusinessCategoryPickerSheet(
+                          context,
+                          categories: categories,
+                          initial: categorySelection,
+                        );
+                        if (result != null) {
+                          setDialogState(() => categorySelection = result);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 10),
                     DropdownButtonFormField<String>(
                       initialValue: status,
                       items: const [
@@ -208,22 +231,48 @@ class _AdminOwnerManagementScreenState extends State<AdminOwnerManagementScreen>
                             );
                             return;
                           }
+                          if (categorySelection.primaryCategoryId == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Please select a primary business category.')),
+                            );
+                            return;
+                          }
 
                           setDialogState(() => submitting = true);
                           try {
-                            await AdminDashboardService.createOwner(
+                            final businessId = await AdminDashboardService.createOwner(
                               ownerName: nameController.text.trim(),
                               phone: normalizedPhone,
                               businessName: businessController.text.trim(),
                               address: addressController.text.trim().isEmpty ? null : addressController.text.trim(),
                               status: status,
                             );
+
+                            var categoriesSaved = true;
+                            if (businessId != null) {
+                              try {
+                                await AdminCatalogService.setOwnerCategories(
+                                  businessId: businessId,
+                                  primaryCategoryId: categorySelection.primaryCategoryId!,
+                                  additionalCategoryIds: categorySelection.additionalCategoryIds,
+                                );
+                              } catch (_) {
+                                categoriesSaved = false;
+                              }
+                            }
+
                             if (!context.mounted) return;
                             Navigator.pop(context);
                             await _loadOwners();
                             if (!mounted) return;
                             ScaffoldMessenger.of(this.context).showSnackBar(
-                              const SnackBar(content: Text('Owner added successfully.')),
+                              SnackBar(
+                                content: Text(
+                                  categoriesSaved
+                                      ? 'Owner added successfully.'
+                                      : 'Owner added, but business categories could not be saved. Set them via Edit Owner.',
+                                ),
+                              ),
                             );
                           } catch (error) {
                             setDialogState(() => submitting = false);
@@ -276,6 +325,11 @@ class _AdminOwnerManagementScreenState extends State<AdminOwnerManagementScreen>
     final addressController = TextEditingController(text: owner.businessAddress ?? '');
     bool submitting = false;
 
+    final categories = await CategoryService.fetchTopLevel();
+    if (!mounted) return;
+    OwnerCategorySelection categorySelection = await AdminCatalogService.fetchOwnerCategories(owner.businessId);
+    if (!mounted) return;
+
     await showDialog<void>(
       context: context,
       builder: (context) {
@@ -304,6 +358,21 @@ class _AdminOwnerManagementScreenState extends State<AdminOwnerManagementScreen>
                       controller: addressController,
                       decoration: const InputDecoration(labelText: 'Address (optional)'),
                     ),
+                    const SizedBox(height: 10),
+                    _CategorySelectorField(
+                      categories: categories,
+                      selection: categorySelection,
+                      onTap: () async {
+                        final result = await showBusinessCategoryPickerSheet(
+                          context,
+                          categories: categories,
+                          initial: categorySelection,
+                        );
+                        if (result != null) {
+                          setDialogState(() => categorySelection = result);
+                        }
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -326,6 +395,12 @@ class _AdminOwnerManagementScreenState extends State<AdminOwnerManagementScreen>
                             );
                             return;
                           }
+                          if (categorySelection.primaryCategoryId == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Please select a primary business category.')),
+                            );
+                            return;
+                          }
 
                           setDialogState(() => submitting = true);
                           try {
@@ -336,12 +411,30 @@ class _AdminOwnerManagementScreenState extends State<AdminOwnerManagementScreen>
                               businessName: businessController.text.trim(),
                               address: addressController.text.trim().isEmpty ? null : addressController.text.trim(),
                             );
+
+                            var categoriesSaved = true;
+                            try {
+                              await AdminCatalogService.setOwnerCategories(
+                                businessId: owner.businessId,
+                                primaryCategoryId: categorySelection.primaryCategoryId!,
+                                additionalCategoryIds: categorySelection.additionalCategoryIds,
+                              );
+                            } catch (_) {
+                              categoriesSaved = false;
+                            }
+
                             if (!context.mounted) return;
                             Navigator.pop(context);
                             await _loadOwners();
                             if (!mounted) return;
                             ScaffoldMessenger.of(this.context).showSnackBar(
-                              const SnackBar(content: Text('Owner updated successfully.')),
+                              SnackBar(
+                                content: Text(
+                                  categoriesSaved
+                                      ? 'Owner updated successfully.'
+                                      : 'Owner updated, but business categories could not be saved.',
+                                ),
+                              ),
                             );
                           } catch (error) {
                             setDialogState(() => submitting = false);
@@ -589,4 +682,76 @@ class _StatusStyle {
   final String label;
   final Color bg;
   final Color fg;
+}
+
+/// Shows the current Primary (starred)/Additional category selection as
+/// chips and opens [showBusinessCategoryPickerSheet] on tap -- shared by
+/// both the Add Owner and Edit Owner dialogs.
+class _CategorySelectorField extends StatelessWidget {
+  const _CategorySelectorField({required this.categories, required this.selection, required this.onTap});
+
+  final List<CatalogCategory> categories;
+  final OwnerCategorySelection selection;
+  final VoidCallback onTap;
+
+  String? _nameOf(String? id) {
+    if (id == null) return null;
+    for (final category in categories) {
+      if (category.id == id) return category.name;
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final primaryName = _nameOf(selection.primaryCategoryId);
+    final additionalNames = selection.additionalCategoryIds.map(_nameOf).whereType<String>().toList();
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.divider),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Expanded(child: Text('Business Categories *', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
+                Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textSecondary),
+              ],
+            ),
+            const SizedBox(height: 6),
+            if (primaryName == null)
+              const Text('Tap to select a primary category', style: AppTextStyles.bodyMuted)
+            else
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  Chip(
+                    label: Text('★ $primaryName'),
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+                    labelStyle: const TextStyle(color: AppColors.primaryDark, fontSize: 11.5, fontWeight: FontWeight.w700),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  ...additionalNames.map(
+                    (name) => Chip(
+                      label: Text(name),
+                      labelStyle: const TextStyle(fontSize: 11.5),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }
